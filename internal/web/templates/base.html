@@ -1,0 +1,31 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{block "title" .}}Darkly{{end}}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12" crossorigin="anonymous"></script>
+  <style>
+    [x-cloak] { display: none; }
+    .platform-ebay    { background: #FFE500; color: #333; }
+    .platform-buyee   { background: #E8380D; color: #fff; }
+    .platform-gumtree { background: #72AE2D; color: #fff; }
+    .platform-facebook{ background: #1877F2; color: #fff; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-900 text-sm">
+  <nav class="bg-gray-900 text-gray-100 px-6 py-3 flex items-center gap-6 shadow">
+    <a href="/" class="font-bold text-lg tracking-tight text-white">darkly</a>
+    <a href="/searches" class="hover:text-white text-gray-400 transition-colors">Searches</a>
+    <a href="/listings" class="hover:text-white text-gray-400 transition-colors">Listings</a>
+    <a href="/bids" class="hover:text-white text-gray-400 transition-colors">Bids</a>
+    <a href="/scan-runs" class="hover:text-white text-gray-400 transition-colors">Scan Log</a>
+  </nav>
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    {{block "content" .}}{{end}}
+  </main>
+</body>
+</html>
+{{end}}

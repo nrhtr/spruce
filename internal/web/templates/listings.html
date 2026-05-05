@@ -1,0 +1,105 @@
+{{define "title"}}Listings — Darkly{{end}}
+{{define "content"}}
+<div class="flex justify-between items-center mb-4">
+  <h1 class="text-2xl font-bold text-gray-800">Listings</h1>
+</div>
+
+<form method="GET" class="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-4 flex flex-wrap gap-3 items-end">
+  <div>
+    <label class="block text-xs text-gray-500 mb-1">Search</label>
+    <select name="search_id" class="border border-gray-300 rounded px-2 py-1.5 text-sm">
+      <option value="">All searches</option>
+      {{range .Searches}}
+      <option value="{{.ID}}" {{if eq $.FilterSearchID .ID}}selected{{end}}>{{.Name}}</option>
+      {{end}}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs text-gray-500 mb-1">Platform</label>
+    <select name="platform" class="border border-gray-300 rounded px-2 py-1.5 text-sm">
+      <option value="">All platforms</option>
+      <option value="ebay" {{if eq .FilterPlatform "ebay"}}selected{{end}}>eBay</option>
+      <option value="buyee" {{if eq .FilterPlatform "buyee"}}selected{{end}}>Buyee</option>
+      <option value="gumtree" {{if eq .FilterPlatform "gumtree"}}selected{{end}}>Gumtree</option>
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs text-gray-500 mb-1">Min score</label>
+    <select name="min_score" class="border border-gray-300 rounded px-2 py-1.5 text-sm">
+      <option value="0" {{if eq .FilterMinScore 0.0}}selected{{end}}>Any</option>
+      <option value="5" {{if eq .FilterMinScore 5.0}}selected{{end}}>5+</option>
+      <option value="7" {{if eq .FilterMinScore 7.0}}selected{{end}}>7+</option>
+      <option value="9" {{if eq .FilterMinScore 9.0}}selected{{end}}>9+</option>
+    </select>
+  </div>
+  <button type="submit" class="bg-indigo-600 text-white px-3 py-1.5 rounded text-sm hover:bg-indigo-700">Filter</button>
+</form>
+
+{{if .Listings}}
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+  <table class="w-full">
+    <thead class="bg-gray-50 border-b border-gray-200">
+      <tr>
+        <th class="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Item</th>
+        <th class="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Price</th>
+        <th class="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Score</th>
+        <th class="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Ends</th>
+        <th class="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Status</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {{range .Listings}}
+      <tr class="hover:bg-gray-50">
+        <td class="px-4 py-3">
+          <a href="/listings/{{.ID}}" class="font-medium text-gray-800 hover:text-indigo-600 block">{{.Title}}</a>
+          <div class="flex items-center gap-2 mt-0.5">
+            <span class="px-1.5 py-0.5 rounded text-xs font-medium platform-{{.Platform}}">{{.Platform}}</span>
+            {{if .Location}}<span class="text-xs text-gray-400">{{.Location}}</span>{{end}}
+          </div>
+        </td>
+        <td class="px-4 py-3 font-semibold text-green-700 whitespace-nowrap">
+          {{if .Price.Valid}}{{formatPrice .Price .Currency}}{{else}}—{{end}}
+        </td>
+        <td class="px-4 py-3">
+          {{if gt .EvalScore 0.0}}
+          <span class="font-bold {{scoreColor .EvalScore}}">{{printf "%.1f" .EvalScore}}</span>
+          {{else}}
+          <span class="text-gray-300">—</span>
+          {{end}}
+        </td>
+        <td class="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+          {{if .EndTime.Valid}}
+          <span {{if .EndingSoon}}class="text-red-600 font-semibold"{{end}}>{{formatTime .EndTime.Int64}}</span>
+          {{else}}—{{end}}
+        </td>
+        <td class="px-4 py-3">
+          <span class="px-2 py-0.5 rounded-full text-xs
+            {{if eq .Status "active"}}bg-green-100 text-green-700
+            {{else if eq .Status "ended"}}bg-gray-100 text-gray-500
+            {{else}}bg-yellow-100 text-yellow-700{{end}}">
+            {{.Status}}
+          </span>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+
+<div class="flex justify-between items-center mt-4 text-sm text-gray-500">
+  <span>{{.Total}} listing(s)</span>
+  <div class="flex gap-2">
+    {{if gt .Page 1}}
+    <a href="?{{.QueryString}}&page={{dec .Page}}" class="px-3 py-1 border rounded hover:bg-gray-100">← Prev</a>
+    {{end}}
+    {{if .HasMore}}
+    <a href="?{{.QueryString}}&page={{inc .Page}}" class="px-3 py-1 border rounded hover:bg-gray-100">Next →</a>
+    {{end}}
+  </div>
+</div>
+{{else}}
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+  <p class="text-gray-400">No listings found. Try different filters or create a search.</p>
+</div>
+{{end}}
+{{end}}

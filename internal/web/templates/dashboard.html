@@ -1,0 +1,93 @@
+{{define "title"}}Dashboard — Darkly{{end}}
+{{define "content"}}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-gray-800">Dashboard</h1>
+</div>
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+  <div class="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+    <div class="text-2xl font-bold text-indigo-600">{{.Stats.ActiveSearches}}</div>
+    <div class="text-gray-500 text-xs mt-1">Active searches</div>
+  </div>
+  <div class="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+    <div class="text-2xl font-bold text-gray-800">{{.Stats.TotalListings}}</div>
+    <div class="text-gray-500 text-xs mt-1">Total listings</div>
+  </div>
+  <div class="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+    <div class="text-2xl font-bold text-green-600">{{.Stats.NewToday}}</div>
+    <div class="text-gray-500 text-xs mt-1">New today</div>
+  </div>
+  <div class="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+    <div class="text-2xl font-bold text-red-600">{{.Stats.UpcomingCount}}</div>
+    <div class="text-gray-500 text-xs mt-1">Ending soon</div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div class="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+        <h2 class="font-semibold text-gray-700">Top Discoveries</h2>
+        <a href="/listings" class="text-indigo-600 hover:text-indigo-800 text-xs">View all →</a>
+      </div>
+      {{if .TopListings}}
+      <div class="divide-y divide-gray-50">
+        {{range .TopListings}}
+        <div class="px-4 py-3 hover:bg-gray-50">
+          <div class="flex justify-between items-start gap-2">
+            <div class="flex-1 min-w-0">
+              <a href="/listings/{{.ID}}" class="font-medium text-gray-800 hover:text-indigo-600 block truncate">{{.Title}}</a>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="px-1.5 py-0.5 rounded text-xs font-medium platform-{{.Platform}}">{{.Platform}}</span>
+                {{if .Price}}<span class="text-green-700 font-semibold">{{.Price}}</span>{{end}}
+                {{if .EndTime}}<span class="text-red-600 text-xs">ends {{.EndTime}}</span>{{end}}
+              </div>
+            </div>
+            {{if .Score}}
+            <div class="text-right shrink-0">
+              <div class="text-lg font-bold {{scoreColor .Score}}">{{printf "%.1f" .Score}}</div>
+              <div class="text-xs text-gray-400">/10</div>
+            </div>
+            {{end}}
+          </div>
+        </div>
+        {{end}}
+      </div>
+      {{else}}
+      <p class="px-4 py-8 text-center text-gray-400">No listings yet. Create a search to get started.</p>
+      {{end}}
+    </div>
+  </div>
+
+  <div class="space-y-4">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div class="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+        <h2 class="font-semibold text-gray-700">Ending Soon</h2>
+      </div>
+      {{if .UpcomingEndings}}
+      <div class="divide-y divide-gray-50">
+        {{range .UpcomingEndings}}
+        <div class="px-4 py-3">
+          <a href="/listings/{{.ID}}" class="font-medium text-gray-800 hover:text-indigo-600 block truncate text-xs">{{.Title}}</a>
+          <div class="text-red-600 text-xs font-semibold mt-0.5">{{.EndTime}}</div>
+          {{if .Price}}<div class="text-gray-600 text-xs">{{.Price}}</div>{{end}}
+        </div>
+        {{end}}
+      </div>
+      {{else}}
+      <p class="px-4 py-6 text-center text-gray-400 text-xs">No auctions ending soon</p>
+      {{end}}
+    </div>
+
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div class="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+        <h2 class="font-semibold text-gray-700">Recent Scans</h2>
+        <span class="text-xs text-gray-400" id="scan-refresh-indicator">auto-refresh</span>
+      </div>
+      <div hx-get="/scan-runs/partial" hx-trigger="load, every 30s" hx-swap="innerHTML" class="min-h-16">
+        <p class="px-4 py-4 text-center text-gray-400 text-xs">Loading…</p>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
