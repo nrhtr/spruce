@@ -21,6 +21,15 @@
     </tbody>
   </table>
 </div>
+
+<div class="flex justify-end gap-2 mt-4 text-sm text-gray-500">
+  {{if gt .Page 1}}
+  <a href="?page={{dec .Page}}" class="px-3 py-1 border rounded hover:bg-gray-100">← Newer</a>
+  {{end}}
+  {{if .HasMore}}
+  <a href="?page={{inc .Page}}" class="px-3 py-1 border rounded hover:bg-gray-100">Older →</a>
+  {{end}}
+</div>
 {{end}}
 
 {{define "scan_runs_rows"}}

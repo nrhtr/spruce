@@ -422,6 +422,20 @@ func (q *Queries) ListRecentListings(ctx context.Context, limit int64) ([]ListRe
 	return items, nil
 }
 
+const updateListingImages = `-- name: UpdateListingImages :exec
+UPDATE listings SET image_urls = ? WHERE id = ?
+`
+
+type UpdateListingImagesParams struct {
+	ImageUrls string `json:"image_urls"`
+	ID        int64  `json:"id"`
+}
+
+func (q *Queries) UpdateListingImages(ctx context.Context, arg UpdateListingImagesParams) error {
+	_, err := q.db.ExecContext(ctx, updateListingImages, arg.ImageUrls, arg.ID)
+	return err
+}
+
 const updateListingStatus = `-- name: UpdateListingStatus :exec
 UPDATE listings SET status = ?, last_seen = unixepoch() WHERE id = ?
 `

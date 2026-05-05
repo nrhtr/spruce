@@ -36,7 +36,7 @@ func Load() *Config {
 		DigestTZ:        getenv("DARKLY_DIGEST_TZ", "Australia/Sydney"),
 		EmailFrom:       getenv("DARKLY_EMAIL_FROM", "darkly@localhost"),
 		EmailTo:         getenv("DARKLY_EMAIL_TO", ""),
-		ScanCron:        getenv("DARKLY_SCAN_CRON", "*/30 * * * *"),
+		ScanCron:        getenv("DARKLY_SCAN_CRON", "0 */3 * * *"),
 		UrgentThreshold: getenvDuration("DARKLY_URGENT_THRESHOLD", 12*time.Hour),
 
 		AnthropicAPIKey: getenv("ANTHROPIC_API_KEY", ""),

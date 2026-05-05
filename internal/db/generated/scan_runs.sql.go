@@ -10,6 +10,17 @@ import (
 	"database/sql"
 )
 
+const countScanRuns = `-- name: CountScanRuns :one
+SELECT COUNT(*) FROM scan_runs
+`
+
+func (q *Queries) CountScanRuns(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countScanRuns)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createScanRun = `-- name: CreateScanRun :one
 INSERT INTO scan_runs (search_id, platform) VALUES (?, ?)
 RETURNING id, search_id, platform, started_at, finished_at, new_items, errors, status
@@ -100,6 +111,64 @@ func (q *Queries) ListRecentScanRuns(ctx context.Context, limit int64) ([]ListRe
 	var items []ListRecentScanRunsRow
 	for rows.Next() {
 		var i ListRecentScanRunsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SearchID,
+			&i.Platform,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.NewItems,
+			&i.Errors,
+			&i.Status,
+			&i.SearchName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listScanRunsPaged = `-- name: ListScanRunsPaged :many
+SELECT sr.id, sr.search_id, sr.platform, sr.started_at, sr.finished_at, sr.new_items, sr.errors, sr.status, s.name AS search_name
+FROM scan_runs sr
+JOIN searches s ON s.id = sr.search_id
+ORDER BY sr.started_at DESC
+LIMIT ? OFFSET ?
+`
+
+type ListScanRunsPagedParams struct {
+	Limit  int64 `json:"limit"`
+	Offset int64 `json:"offset"`
+}
+
+type ListScanRunsPagedRow struct {
+	ID         int64         `json:"id"`
+	SearchID   int64         `json:"search_id"`
+	Platform   string        `json:"platform"`
+	StartedAt  int64         `json:"started_at"`
+	FinishedAt sql.NullInt64 `json:"finished_at"`
+	NewItems   int64         `json:"new_items"`
+	Errors     string        `json:"errors"`
+	Status     string        `json:"status"`
+	SearchName string        `json:"search_name"`
+}
+
+func (q *Queries) ListScanRunsPaged(ctx context.Context, arg ListScanRunsPagedParams) ([]ListScanRunsPagedRow, error) {
+	rows, err := q.db.QueryContext(ctx, listScanRunsPaged, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListScanRunsPagedRow
+	for rows.Next() {
+		var i ListScanRunsPagedRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.SearchID,

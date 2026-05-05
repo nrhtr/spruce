@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log/slog"
+	"sync"
 	"time"
 
 	dbgen "github.com/nrhtr/darkly/internal/db/generated"
@@ -18,6 +19,7 @@ type Scanner struct {
 	platforms map[string]platform.Platform
 	evaluator *evaluator.Evaluator
 	log       *slog.Logger
+	mu        sync.Mutex
 }
 
 func New(db *sql.DB, queries *dbgen.Queries, platforms []platform.Platform, eval *evaluator.Evaluator, log *slog.Logger) *Scanner {
@@ -35,17 +37,21 @@ func New(db *sql.DB, queries *dbgen.Queries, platforms []platform.Platform, eval
 }
 
 func (s *Scanner) RunAll(ctx context.Context) {
+	if !s.mu.TryLock() {
+		s.log.Warn("scan already in progress, skipping")
+		return
+	}
+	defer s.mu.Unlock()
+
 	searches, err := s.queries.ListActiveSearches(ctx)
 	if err != nil {
 		s.log.Error("list searches", "error", err)
 		return
 	}
 	for _, search := range searches {
-		go func(sr dbgen.Search) {
-			if err := s.RunSearch(ctx, sr); err != nil {
-				s.log.Error("scan search", "search_id", sr.ID, "error", err)
-			}
-		}(search)
+		if err := s.RunSearch(ctx, search); err != nil {
+			s.log.Error("scan search", "search_id", search.ID, "error", err)
+		}
 	}
 }
 
@@ -162,6 +168,29 @@ func (s *Scanner) runPlatformSearch(ctx context.Context, search dbgen.Search, p 
 			listing dbgen.Listing
 			isNew   bool
 		}{upserted, isNew})
+	}
+
+	// Fetch full image set for new listings from the detail page.
+	for _, t := range evalTargets {
+		if !t.isNew {
+			continue
+		}
+		detail, err := p.GetListing(ctx, t.listing.ExternalID)
+		if err != nil {
+			s.log.Warn("fetch listing detail", "listing_id", t.listing.ID, "error", err)
+			continue
+		}
+		if len(detail.ImageURLs) > 1 {
+			imageJSON, _ := json.Marshal(detail.ImageURLs)
+			if err := s.queries.UpdateListingImages(ctx, dbgen.UpdateListingImagesParams{
+				ImageUrls: string(imageJSON),
+				ID:        t.listing.ID,
+			}); err != nil {
+				s.log.Warn("update listing images", "listing_id", t.listing.ID, "error", err)
+			} else {
+				s.log.Debug("updated images", "listing_id", t.listing.ID, "count", len(detail.ImageURLs))
+			}
+		}
 	}
 
 	// Evaluate new listings with Claude.

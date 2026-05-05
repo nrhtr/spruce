@@ -13,12 +13,14 @@ type Querier interface {
 	CountActiveSearches(ctx context.Context) (int64, error)
 	CountListingsBySearch(ctx context.Context, searchID int64) (int64, error)
 	CountNewToday(ctx context.Context, firstSeen int64) (int64, error)
+	CountScanRuns(ctx context.Context) (int64, error)
 	CountTotalListings(ctx context.Context) (int64, error)
 	CreateBid(ctx context.Context, arg CreateBidParams) (Bid, error)
 	CreateEmailNotification(ctx context.Context, arg CreateEmailNotificationParams) (EmailNotification, error)
 	CreateScanRun(ctx context.Context, arg CreateScanRunParams) (ScanRun, error)
 	CreateSearch(ctx context.Context, arg CreateSearchParams) (Search, error)
 	DeactivateSearch(ctx context.Context, id int64) error
+	DeleteSearch(ctx context.Context, id int64) error
 	FinishScanRun(ctx context.Context, arg FinishScanRunParams) (ScanRun, error)
 	GetBid(ctx context.Context, id int64) (Bid, error)
 	GetEvaluation(ctx context.Context, arg GetEvaluationParams) (Evaluation, error)
@@ -40,8 +42,10 @@ type Querier interface {
 	ListNewSince(ctx context.Context, arg ListNewSinceParams) ([]Listing, error)
 	ListRecentListings(ctx context.Context, limit int64) ([]ListRecentListingsRow, error)
 	ListRecentScanRuns(ctx context.Context, limit int64) ([]ListRecentScanRunsRow, error)
+	ListScanRunsPaged(ctx context.Context, arg ListScanRunsPagedParams) ([]ListScanRunsPagedRow, error)
 	SetImageCache(ctx context.Context, arg SetImageCacheParams) error
 	UpdateBidResult(ctx context.Context, arg UpdateBidResultParams) (Bid, error)
+	UpdateListingImages(ctx context.Context, arg UpdateListingImagesParams) error
 	UpdateListingStatus(ctx context.Context, arg UpdateListingStatusParams) error
 	UpdateSearch(ctx context.Context, arg UpdateSearchParams) (Search, error)
 	UpsertEvaluation(ctx context.Context, arg UpsertEvaluationParams) (Evaluation, error)

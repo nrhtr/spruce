@@ -22,5 +22,8 @@ RETURNING *;
 -- name: DeactivateSearch :exec
 UPDATE searches SET active = 0, updated_at = unixepoch() WHERE id = ?;
 
+-- name: DeleteSearch :exec
+DELETE FROM searches WHERE id = ?;
+
 -- name: CountActiveSearches :one
 SELECT COUNT(*) FROM searches WHERE active = 1;

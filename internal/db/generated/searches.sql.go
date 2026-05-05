@@ -76,6 +76,15 @@ func (q *Queries) DeactivateSearch(ctx context.Context, id int64) error {
 	return err
 }
 
+const deleteSearch = `-- name: DeleteSearch :exec
+DELETE FROM searches WHERE id = ?
+`
+
+func (q *Queries) DeleteSearch(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deleteSearch, id)
+	return err
+}
+
 const getSearch = `-- name: GetSearch :one
 SELECT id, name, keywords, description, min_price, max_price, currency, location, platforms, active, created_at, updated_at FROM searches WHERE id = ?
 `

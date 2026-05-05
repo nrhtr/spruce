@@ -13,7 +13,7 @@
         <th class="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Name</th>
         <th class="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Keywords</th>
         <th class="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Platforms</th>
-        <th class="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Price</th>
+        <th class="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Listings</th>
         <th class="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Status</th>
         <th class="px-4 py-2"></th>
       </tr>
@@ -22,7 +22,7 @@
       {{range .Searches}}
       <tr class="hover:bg-gray-50">
         <td class="px-4 py-3 font-medium text-gray-800">
-          <a href="/listings?search_id={{.ID}}" class="hover:text-indigo-600">{{.Name}}</a>
+          <a href="/searches/{{.ID}}/edit" class="hover:text-indigo-600">{{.Name}}</a>
         </td>
         <td class="px-4 py-3 text-gray-600 max-w-xs truncate">{{.Keywords}}</td>
         <td class="px-4 py-3">
@@ -33,11 +33,7 @@
           </div>
         </td>
         <td class="px-4 py-3 text-gray-600">
-          {{if and .MinPrice.Valid .MaxPrice.Valid}}
-            {{printf "%.0f" .MinPrice.Float64}}–{{printf "%.0f" .MaxPrice.Float64}} {{.Currency}}
-          {{else if .MaxPrice.Valid}}
-            ≤{{printf "%.0f" .MaxPrice.Float64}} {{.Currency}}
-          {{else}}—{{end}}
+          <a href="/listings?search_id={{.ID}}" class="hover:text-indigo-600">{{.ListingCount}}</a>
         </td>
         <td class="px-4 py-3">
           {{if eq .Active 1}}
@@ -49,9 +45,11 @@
         <td class="px-4 py-3">
           <div class="flex gap-2 justify-end">
             <form method="POST" action="/searches/{{.ID}}/scan">
-              <button class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Scan now</button>
+              <button class="inline-flex items-center gap-1 text-xs border border-indigo-300 text-indigo-600 hover:bg-indigo-50 rounded px-2 py-1 font-medium">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                Scan
+              </button>
             </form>
-            <a href="/searches/{{.ID}}/edit" class="text-xs text-gray-500 hover:text-gray-700">Edit</a>
           </div>
         </td>
       </tr>

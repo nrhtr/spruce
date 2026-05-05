@@ -69,6 +69,9 @@ SELECT COUNT(*) FROM listings;
 -- name: UpdateListingStatus :exec
 UPDATE listings SET status = ?, last_seen = unixepoch() WHERE id = ?;
 
+-- name: UpdateListingImages :exec
+UPDATE listings SET image_urls = ? WHERE id = ?;
+
 -- name: ListRecentListings :many
 SELECT l.*, COALESCE(
     (SELECT e.score FROM evaluations e WHERE e.listing_id = l.id ORDER BY e.created_at DESC LIMIT 1),

@@ -14,3 +14,13 @@ FROM scan_runs sr
 JOIN searches s ON s.id = sr.search_id
 ORDER BY sr.started_at DESC
 LIMIT ?;
+
+-- name: ListScanRunsPaged :many
+SELECT sr.*, s.name AS search_name
+FROM scan_runs sr
+JOIN searches s ON s.id = sr.search_id
+ORDER BY sr.started_at DESC
+LIMIT ? OFFSET ?;
+
+-- name: CountScanRuns :one
+SELECT COUNT(*) FROM scan_runs;

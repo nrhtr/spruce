@@ -13,10 +13,25 @@
           <h1 class="text-xl font-bold text-gray-900">{{.Listing.Title}}</h1>
           {{if .Listing.Location}}<p class="text-gray-400 text-sm mt-1">📍 {{.Listing.Location}}</p>{{end}}
         </div>
-        <a href="{{.Listing.Url}}" target="_blank" rel="noopener"
-          class="shrink-0 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium">
-          View listing ↗
-        </a>
+        <div class="flex flex-col items-end gap-2 shrink-0">
+          <a href="{{.Listing.Url}}" target="_blank" rel="noopener"
+            class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium">
+            View listing ↗
+          </a>
+          {{if eq .Listing.Status "muted"}}
+          <form method="POST" action="/listings/{{.Listing.ID}}/unmute">
+            <button type="submit" class="text-xs text-indigo-600 hover:text-indigo-800 border border-indigo-200 px-2 py-1 rounded hover:bg-indigo-50">
+              Unmute listing
+            </button>
+          </form>
+          {{else}}
+          <form method="POST" action="/listings/{{.Listing.ID}}/mute">
+            <button type="submit" class="text-xs text-gray-400 hover:text-red-500 border border-gray-200 px-2 py-1 rounded hover:bg-red-50">
+              Mute listing
+            </button>
+          </form>
+          {{end}}
+        </div>
       </div>
 
       <div class="flex flex-wrap gap-6 mt-4 border-t border-gray-100 pt-4">
@@ -50,7 +65,9 @@
       {{if .ImageURLs}}
       <div class="flex gap-2 mt-4 overflow-x-auto">
         {{range .ImageURLs}}
-        <img src="{{proxyURL .}}" class="h-32 w-auto rounded object-cover border border-gray-200" loading="lazy">
+        <img src="{{proxyURL .}}" data-full="{{proxyURL .}}"
+          class="h-32 w-auto rounded object-cover border border-gray-200 cursor-pointer hover:opacity-90 lightbox-trigger"
+          loading="lazy">
         {{end}}
       </div>
       {{end}}
@@ -111,7 +128,20 @@
 
     {{if .Bids}}
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-      <h2 class="font-semibold text-gray-700 mb-3">Bid History</h2>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-semibold text-gray-700">Bid History</h2>
+        {{if eq .WinningStatus "winning"}}
+        <span class="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-semibold">Winning</span>
+        {{else if eq .WinningStatus "outbid"}}
+        <span class="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-semibold">Outbid</span>
+        {{end}}
+      </div>
+      {{if and .WinningStatus .Listing.Price.Valid}}
+      <p class="text-xs text-gray-500 mb-2">
+        Current price: <span class="font-medium text-gray-700">{{formatPrice .Listing.Price .Listing.Currency}}</span>
+        {{if gt .OurBid 0.0}} · Our bid: <span class="font-medium text-gray-700">{{formatPrice2 .OurBid .Listing.Currency}}</span>{{end}}
+      </p>
+      {{end}}
       <div class="space-y-2">
         {{range .Bids}}
         <div class="flex justify-between items-start text-sm border-b border-gray-50 pb-2">
@@ -153,4 +183,46 @@
     </div>
   </div>
 </div>
+
+{{/* Image lightbox modal */}}
+<div id="lightbox" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80" role="dialog" aria-modal="true">
+  <button id="lightbox-close" class="absolute top-4 right-4 text-white text-3xl leading-none opacity-70 hover:opacity-100">&times;</button>
+  <img id="lightbox-img" src="" alt="" class="max-h-[90vh] max-w-[90vw] rounded shadow-lg object-contain">
+</div>
+
+<script>
+(function () {
+  var lb = document.getElementById('lightbox');
+  var lbImg = document.getElementById('lightbox-img');
+  var lbClose = document.getElementById('lightbox-close');
+
+  function open(src) {
+    lbImg.src = src;
+    lb.classList.remove('hidden');
+    lb.classList.add('flex');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function close() {
+    lb.classList.add('hidden');
+    lb.classList.remove('flex');
+    lbImg.src = '';
+    document.body.style.overflow = '';
+  }
+
+  document.querySelectorAll('.lightbox-trigger').forEach(function (img) {
+    img.addEventListener('click', function () {
+      open(img.dataset.full || img.src);
+    });
+  });
+
+  lbClose.addEventListener('click', close);
+  lb.addEventListener('click', function (e) {
+    if (e.target === lb) close();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') close();
+  });
+})();
+</script>
 {{end}}

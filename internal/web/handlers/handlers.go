@@ -22,6 +22,7 @@ import (
 )
 
 type Handler struct {
+	db      *sql.DB
 	queries *dbgen.Queries
 	scanner *scanner.Scanner
 	log     *slog.Logger
@@ -29,12 +30,13 @@ type Handler struct {
 	loc     *time.Location
 }
 
-func New(queries *dbgen.Queries, scnr *scanner.Scanner, log *slog.Logger, loc *time.Location) (*Handler, error) {
+func New(db *sql.DB, queries *dbgen.Queries, scnr *scanner.Scanner, log *slog.Logger, loc *time.Location) (*Handler, error) {
 	tmpls, err := parseTemplates()
 	if err != nil {
 		return nil, err
 	}
 	return &Handler{
+		db:      db,
 		queries: queries,
 		scanner: scnr,
 		log:     log,
@@ -212,10 +214,12 @@ var allPlatforms = []platformOption{
 type searchView struct {
 	dbgen.Search
 	PlatformList []string
+	ListingCount int64
 }
 
 func (h *Handler) ListSearches(w http.ResponseWriter, r *http.Request) {
-	searches, err := h.queries.ListAllSearches(r.Context())
+	ctx := r.Context()
+	searches, err := h.queries.ListAllSearches(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -224,7 +228,8 @@ func (h *Handler) ListSearches(w http.ResponseWriter, r *http.Request) {
 	for _, s := range searches {
 		var pl []string
 		json.Unmarshal([]byte(s.Platforms), &pl)
-		views = append(views, searchView{Search: s, PlatformList: pl})
+		count, _ := h.queries.CountListingsBySearch(ctx, s.ID)
+		views = append(views, searchView{Search: s, PlatformList: pl, ListingCount: count})
 	}
 	h.render(w, "searches", map[string]any{"Searches": views})
 }
@@ -358,6 +363,19 @@ func (h *Handler) UpdateSearch(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/searches", http.StatusSeeOther)
 }
 
+func (h *Handler) DeleteSearch(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := h.queries.DeleteSearch(r.Context(), id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/searches", http.StatusSeeOther)
+}
+
 func (h *Handler) TriggerScan(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r, "id")
 	if err != nil {
@@ -380,90 +398,196 @@ func (h *Handler) TriggerScan(w http.ResponseWriter, r *http.Request) {
 // Listings
 
 type listingsFilter struct {
-	SearchID int64
-	Platform string
-	MinScore float64
-	Page     int
+	SearchID  int64
+	Platform  string
+	MinScore  float64
+	Page      int
+	Sort      string
+	Order     string
+	ShowMuted bool
+}
+
+// listingRow is the view model passed to the listings template.
+type listingRow struct {
+	dbgen.Listing
+	Price      string
+	EvalScore  float64
+	EndTime    string
+	EndingSoon bool
+}
+
+// fetchListings runs a dynamic SQL query based on the filter and returns rows + total count.
+func (h *Handler) fetchListings(ctx context.Context, f listingsFilter) ([]listingRow, int64, error) {
+	const pageSize = 50
+
+	// Resolve sort column (whitelist to prevent injection).
+	sortCol := "eval_score"
+	if f.SearchID == 0 {
+		sortCol = "first_seen"
+	}
+	switch f.Sort {
+	case "score":
+		sortCol = "eval_score"
+	case "price":
+		sortCol = "price"
+	case "end_time":
+		sortCol = "end_time"
+	case "status":
+		sortCol = "status"
+	case "first_seen":
+		sortCol = "first_seen"
+	}
+
+	dir := "DESC"
+	if f.Order == "asc" {
+		dir = "ASC"
+	}
+
+	offset := int64((f.Page - 1) * pageSize)
+
+	var args []any
+	var innerSQL string
+
+	if f.SearchID > 0 {
+		innerSQL = `SELECT l.id, l.external_id, l.platform, l.title, l.description, l.price,
+         l.currency, l.url, l.image_urls, l.end_time, l.condition, l.location,
+         l.raw_data, l.status, l.first_seen, l.last_seen,
+         COALESCE(e.score, -1) AS eval_score
+  FROM listings l
+  JOIN search_listings sl ON sl.listing_id = l.id
+  LEFT JOIN evaluations e ON e.listing_id = l.id AND e.search_id = sl.search_id
+  WHERE sl.search_id = ?`
+		args = append(args, f.SearchID)
+
+		if !f.ShowMuted {
+			innerSQL += ` AND l.status != 'muted'`
+		}
+		if f.Platform != "" {
+			innerSQL += ` AND l.platform = ?`
+			args = append(args, f.Platform)
+		}
+	} else {
+		innerSQL = `SELECT l.id, l.external_id, l.platform, l.title, l.description, l.price,
+         l.currency, l.url, l.image_urls, l.end_time, l.condition, l.location,
+         l.raw_data, l.status, l.first_seen, l.last_seen,
+         COALESCE(
+           (SELECT e.score FROM evaluations e WHERE e.listing_id = l.id ORDER BY e.created_at DESC LIMIT 1),
+           -1
+         ) AS eval_score
+  FROM listings l
+  WHERE 1=1`
+
+		if !f.ShowMuted {
+			innerSQL += ` AND l.status != 'muted'`
+		}
+		if f.Platform != "" {
+			innerSQL += ` AND l.platform = ?`
+			args = append(args, f.Platform)
+		}
+	}
+
+	// Count query wraps the inner SQL.
+	var countArgs []any
+	countArgs = append(countArgs, args...)
+	countSQL := `SELECT COUNT(*) FROM (` + innerSQL + `) sub`
+	if f.MinScore > 0 {
+		countSQL += ` WHERE sub.eval_score >= ?`
+		countArgs = append(countArgs, f.MinScore)
+	}
+
+	var total int64
+	if err := h.db.QueryRowContext(ctx, countSQL, countArgs...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	// Data query adds WHERE for min score, ORDER BY, LIMIT, OFFSET.
+	dataSQL := `SELECT sub.* FROM (` + innerSQL + `) sub`
+	dataArgs := append([]any{}, args...)
+	if f.MinScore > 0 {
+		dataSQL += ` WHERE sub.eval_score >= ?`
+		dataArgs = append(dataArgs, f.MinScore)
+	}
+	dataSQL += ` ORDER BY sub.` + sortCol + ` ` + dir + ` NULLS LAST`
+	dataSQL += ` LIMIT 51 OFFSET ?`
+	dataArgs = append(dataArgs, offset)
+
+	sqlRows, err := h.db.QueryContext(ctx, dataSQL, dataArgs...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer sqlRows.Close()
+
+	var results []listingRow
+	for sqlRows.Next() {
+		var (
+			id, firstSeen, lastSeen                       int64
+			externalID, platform, title, description      string
+			currency, url, imageUrls, condition, location string
+			rawData, status                               string
+			price                                         sql.NullFloat64
+			endTime                                       sql.NullInt64
+			evalScore                                     float64
+		)
+		if err := sqlRows.Scan(
+			&id, &externalID, &platform, &title, &description,
+			&price, &currency, &url, &imageUrls, &endTime,
+			&condition, &location, &rawData, &status,
+			&firstSeen, &lastSeen, &evalScore,
+		); err != nil {
+			return nil, 0, err
+		}
+		listing := dbgen.Listing{
+			ID: id, ExternalID: externalID, Platform: platform,
+			Title: title, Description: description, Price: price,
+			Currency: currency, Url: url, ImageUrls: imageUrls,
+			EndTime: endTime, Condition: condition, Location: location,
+			RawData: rawData, Status: status, FirstSeen: firstSeen, LastSeen: lastSeen,
+		}
+		lr := listingRow{Listing: listing, EvalScore: evalScore}
+		if price.Valid {
+			lr.Price = notifier.FormatPrice(price, currency)
+		}
+		if endTime.Valid {
+			t := time.Unix(endTime.Int64, 0).In(h.loc)
+			lr.EndTime = t.Format("2 Jan 3:04pm")
+			lr.EndingSoon = time.Until(t) < 24*time.Hour
+		}
+		results = append(results, lr)
+	}
+	if err := sqlRows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	return results, total, nil
 }
 
 func (h *Handler) ListListings(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	f := listingsFilter{Page: 1}
-	if v := r.URL.Query().Get("search_id"); v != "" {
+	q := r.URL.Query()
+	if v := q.Get("search_id"); v != "" {
 		f.SearchID, _ = strconv.ParseInt(v, 10, 64)
 	}
-	f.Platform = r.URL.Query().Get("platform")
-	if v := r.URL.Query().Get("min_score"); v != "" {
+	f.Platform = q.Get("platform")
+	if v := q.Get("min_score"); v != "" {
 		f.MinScore, _ = strconv.ParseFloat(v, 64)
 	}
-	if v := r.URL.Query().Get("page"); v != "" {
+	if v := q.Get("page"); v != "" {
 		if p, err := strconv.Atoi(v); err == nil && p > 0 {
 			f.Page = p
 		}
 	}
+	f.Sort = q.Get("sort")
+	f.Order = q.Get("order")
+	f.ShowMuted = q.Get("show_muted") == "1"
 
 	const pageSize = 50
-	offset := int64((f.Page - 1) * pageSize)
 
-	type listingRow struct {
-		dbgen.Listing
-		Price      string
-		EvalScore  float64
-		EndTime    string
-		EndingSoon bool
-	}
-
-	var rows []listingRow
-	var total int64
-
-	if f.SearchID > 0 {
-		// Use scored view for specific search.
-		scored, err := h.queries.ListListingsBySearchWithScore(ctx, dbgen.ListListingsBySearchWithScoreParams{
-			SearchID: f.SearchID,
-			Limit:    int64(pageSize + 1),
-			Offset:   offset,
-		})
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		total, _ = h.queries.CountListingsBySearch(ctx, f.SearchID)
-		for _, l := range scored {
-			lr := listingRow{
-				Listing:   convertScoredRow(l),
-				EvalScore: l.EvalScore,
-			}
-			if l.Price.Valid {
-				lr.Price = notifier.FormatPrice(l.Price, l.Currency)
-			}
-			if l.EndTime.Valid {
-				t := time.Unix(l.EndTime.Int64, 0).In(h.loc)
-				lr.EndTime = t.Format("2 Jan 3:04pm")
-				lr.EndingSoon = time.Until(t) < 24*time.Hour
-			}
-			rows = append(rows, lr)
-		}
-	} else {
-		listings, err := h.queries.ListRecentListings(ctx, int64(pageSize+1))
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		total, _ = h.queries.CountTotalListings(ctx)
-		for _, l := range listings {
-			listing, score := convertRecentRow(l)
-			lr := listingRow{Listing: listing, EvalScore: score}
-			if l.Price.Valid {
-				lr.Price = notifier.FormatPrice(l.Price, l.Currency)
-			}
-			if l.EndTime.Valid {
-				t := time.Unix(l.EndTime.Int64, 0).In(h.loc)
-				lr.EndTime = t.Format("2 Jan 3:04pm")
-				lr.EndingSoon = time.Until(t) < 24*time.Hour
-			}
-			rows = append(rows, lr)
-		}
+	rows, total, err := h.fetchListings(ctx, f)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	hasMore := len(rows) > pageSize
@@ -475,16 +599,63 @@ func (h *Handler) ListListings(w http.ResponseWriter, r *http.Request) {
 
 	qs := buildQueryString(r, "page")
 	h.render(w, "listings", map[string]any{
-		"Listings":       rows,
-		"Searches":       searches,
-		"FilterSearchID": f.SearchID,
-		"FilterPlatform": f.Platform,
-		"FilterMinScore": f.MinScore,
-		"Page":           f.Page,
-		"HasMore":        hasMore,
-		"Total":          total,
-		"QueryString":    qs,
+		"Listings":        rows,
+		"Searches":        searches,
+		"FilterSearchID":  f.SearchID,
+		"FilterPlatform":  f.Platform,
+		"FilterMinScore":  f.MinScore,
+		"FilterSort":      f.Sort,
+		"FilterOrder":     f.Order,
+		"FilterShowMuted": f.ShowMuted,
+		"Page":            f.Page,
+		"HasMore":         hasMore,
+		"Total":           total,
+		"QueryString":     template.URL(qs),
+		"SortPrice":       sortURL(r, "price", f.Sort, f.Order),
+		"SortScore":       sortURL(r, "score", f.Sort, f.Order),
+		"SortEndTime":     sortURL(r, "end_time", f.Sort, f.Order),
+		"SortStatus":      sortURL(r, "status", f.Sort, f.Order),
 	})
+}
+
+func (h *Handler) MuteListing(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := h.queries.UpdateListingStatus(r.Context(), dbgen.UpdateListingStatusParams{
+		Status: "muted",
+		ID:     id,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if ref := r.Header.Get("Referer"); ref != "" {
+		http.Redirect(w, r, ref, http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/listings", http.StatusSeeOther)
+}
+
+func (h *Handler) UnmuteListing(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := h.queries.UpdateListingStatus(r.Context(), dbgen.UpdateListingStatusParams{
+		Status: "active",
+		ID:     id,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if ref := r.Header.Get("Referer"); ref != "" {
+		http.Redirect(w, r, ref, http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/listings", http.StatusSeeOther)
 }
 
 func (h *Handler) GetListing(w http.ResponseWriter, r *http.Request) {
@@ -537,6 +708,27 @@ func (h *Handler) GetListing(w http.ResponseWriter, r *http.Request) {
 		// For now we don't store them separately; this is a future enhancement.
 	}
 
+	// Compute winning status from bid history vs current price.
+	winningStatus := ""
+	ourBidAmount := 0.0
+	if len(bids) > 0 {
+		// Find our highest pending/active bid.
+		for _, b := range bids {
+			if b.Result == "pending" || b.Result == "" {
+				if b.Amount > ourBidAmount {
+					ourBidAmount = b.Amount
+				}
+			}
+		}
+		if ourBidAmount > 0 && l.Price.Valid {
+			if ourBidAmount >= l.Price.Float64 {
+				winningStatus = "winning"
+			} else {
+				winningStatus = "outbid"
+			}
+		}
+	}
+
 	h.render(w, "listing_detail", map[string]any{
 		"Listing":       l,
 		"Bids":          bids,
@@ -546,6 +738,8 @@ func (h *Handler) GetListing(w http.ResponseWriter, r *http.Request) {
 		"EndingSoon":    endingSoon,
 		"TimeRemaining": timeRemaining,
 		"BackURL":       r.URL.Query().Get("back"),
+		"WinningStatus": winningStatus,
+		"OurBid":        ourBidAmount,
 	})
 }
 
@@ -622,7 +816,7 @@ func (h *Handler) ListBids(w http.ResponseWriter, r *http.Request) {
 // Scan Runs
 
 type scanRunView struct {
-	dbgen.ListRecentScanRunsRow
+	dbgen.ListScanRunsPagedRow
 	Duration string
 }
 
@@ -641,11 +835,27 @@ func (h *Handler) ScanRunsPartial(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "scan_runs_rows", data)
 }
 
+const scanRunsPageSize = 25
+
 func (h *Handler) scanRunData(r *http.Request) map[string]any {
-	runs, _ := h.queries.ListRecentScanRuns(r.Context(), 50)
+	page := 1
+	if v := r.URL.Query().Get("page"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil && p > 0 {
+			page = p
+		}
+	}
+	offset := int64((page - 1) * scanRunsPageSize)
+	runs, _ := h.queries.ListScanRunsPaged(r.Context(), dbgen.ListScanRunsPagedParams{
+		Limit:  scanRunsPageSize + 1,
+		Offset: offset,
+	})
+	hasMore := len(runs) > scanRunsPageSize
+	if hasMore {
+		runs = runs[:scanRunsPageSize]
+	}
 	var views []scanRunView
 	for _, run := range runs {
-		v := scanRunView{ListRecentScanRunsRow: run}
+		v := scanRunView{ListScanRunsPagedRow: run}
 		if run.FinishedAt.Valid {
 			dur := time.Duration(run.FinishedAt.Int64-run.StartedAt) * time.Second
 			v.Duration = dur.String()
@@ -654,7 +864,11 @@ func (h *Handler) scanRunData(r *http.Request) map[string]any {
 		}
 		views = append(views, v)
 	}
-	return map[string]any{"Runs": views}
+	return map[string]any{
+		"Runs":    views,
+		"Page":    page,
+		"HasMore": hasMore,
+	}
 }
 
 // Helpers
@@ -669,6 +883,21 @@ func buildQueryString(r *http.Request, exclude ...string) string {
 		q.Del(k)
 	}
 	return q.Encode()
+}
+
+// sortURL builds a safe href for a sort column header, toggling direction when
+// the column is already active. Returns template.URL to bypass html/template's
+// URL normalizer (which would otherwise double-encode the query string).
+func sortURL(r *http.Request, col, activeCol, activeOrder string) template.URL {
+	q := r.URL.Query()
+	q.Del("page")
+	dir := "desc"
+	if col == activeCol && activeOrder == "desc" {
+		dir = "asc"
+	}
+	q.Set("sort", col)
+	q.Set("order", dir)
+	return template.URL("?" + q.Encode())
 }
 
 func formatDuration(d time.Duration) string {
@@ -701,27 +930,6 @@ func convertRecentRow(l dbgen.ListRecentListingsRow) (dbgen.Listing, float64) {
 		}
 	}
 	return listing, score
-}
-
-func convertScoredRow(l dbgen.ListListingsBySearchWithScoreRow) dbgen.Listing {
-	return dbgen.Listing{
-		ID:          l.ID,
-		ExternalID:  l.ExternalID,
-		Platform:    l.Platform,
-		Title:       l.Title,
-		Description: l.Description,
-		Price:       l.Price,
-		Currency:    l.Currency,
-		Url:         l.Url,
-		ImageUrls:   l.ImageUrls,
-		EndTime:     l.EndTime,
-		Condition:   l.Condition,
-		Location:    l.Location,
-		RawData:     l.RawData,
-		Status:      l.Status,
-		FirstSeen:   l.FirstSeen,
-		LastSeen:    l.LastSeen,
-	}
 }
 
 // EmailTemplates parses and returns the email template set for use by the notifier.

@@ -74,7 +74,7 @@ func run(log *slog.Logger) error {
 	notif := notifier.New(queries, cfg, log)
 
 	// Load email templates into the notifier.
-	h, err := handlers.New(queries, scnr, log, loc)
+	h, err := handlers.New(sqlDB, queries, scnr, log, loc)
 	if err != nil {
 		return fmt.Errorf("parse templates: %w", err)
 	}
@@ -113,8 +113,11 @@ func run(log *slog.Logger) error {
 	mux.HandleFunc("GET /searches/{id}/edit", h.EditSearchForm)
 	mux.HandleFunc("POST /searches/{id}", h.UpdateSearch)
 	mux.HandleFunc("POST /searches/{id}/scan", h.TriggerScan)
+	mux.HandleFunc("POST /searches/{id}/delete", h.DeleteSearch)
 	mux.HandleFunc("GET /listings", h.ListListings)
 	mux.HandleFunc("GET /listings/{id}", h.GetListing)
+	mux.HandleFunc("POST /listings/{id}/mute", h.MuteListing)
+	mux.HandleFunc("POST /listings/{id}/unmute", h.UnmuteListing)
 	mux.HandleFunc("POST /listings/{id}/bids", h.CreateBid)
 	mux.HandleFunc("POST /bids/{id}", h.UpdateBid)
 	mux.HandleFunc("GET /bids", h.ListBids)
