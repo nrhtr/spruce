@@ -1,3 +1,6 @@
 darkly.db*
 /.claude
 /darkly
+*.log
+.envrc
+.pre-commit-config.yaml

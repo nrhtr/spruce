@@ -7,13 +7,15 @@ import (
 )
 
 type Config struct {
-	DBPath      string
-	ListenAddr  string
-	DigestHour  int
-	DigestTZ    string
-	EmailFrom   string
-	EmailTo     string
-	ScanCron    string
+	DBPath          string
+	ListenAddr      string
+	SiteURL         string
+	DevMode         bool
+	DigestHour      int
+	DigestTZ        string
+	EmailFrom       string
+	EmailTo         string
+	ScanCron        string
 	UrgentThreshold time.Duration
 
 	AnthropicAPIKey string
@@ -28,6 +30,8 @@ func Load() *Config {
 	cfg := &Config{
 		DBPath:          getenv("DARKLY_DB_PATH", "darkly.db"),
 		ListenAddr:      getenv("DARKLY_LISTEN_ADDR", ":8080"),
+		SiteURL:         getenv("DARKLY_SITE_URL", ""),
+		DevMode:         os.Getenv("DARKLY_DEV_MODE") == "true",
 		DigestHour:      getenvInt("DARKLY_DIGEST_HOUR", 18),
 		DigestTZ:        getenv("DARKLY_DIGEST_TZ", "Australia/Sydney"),
 		EmailFrom:       getenv("DARKLY_EMAIL_FROM", "darkly@localhost"),

@@ -6,7 +6,11 @@ ON CONFLICT(platform, external_id) DO UPDATE SET
     title       = excluded.title,
     description = excluded.description,
     price       = excluded.price,
+    currency    = excluded.currency,
+    image_urls  = excluded.image_urls,
     end_time    = excluded.end_time,
+    condition   = excluded.condition,
+    location    = excluded.location,
     status      = excluded.status,
     raw_data    = excluded.raw_data,
     last_seen   = unixepoch()
@@ -66,4 +70,9 @@ SELECT COUNT(*) FROM listings;
 UPDATE listings SET status = ?, last_seen = unixepoch() WHERE id = ?;
 
 -- name: ListRecentListings :many
-SELECT * FROM listings ORDER BY first_seen DESC LIMIT ?;
+SELECT l.*, COALESCE(
+    (SELECT e.score FROM evaluations e WHERE e.listing_id = l.id ORDER BY e.created_at DESC LIMIT 1),
+    -1
+) AS eval_score
+FROM listings l
+ORDER BY l.first_seen DESC LIMIT ?;

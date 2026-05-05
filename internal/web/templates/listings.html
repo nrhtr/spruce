@@ -58,7 +58,7 @@
           </div>
         </td>
         <td class="px-4 py-3 font-semibold text-green-700 whitespace-nowrap">
-          {{if .Price.Valid}}{{formatPrice .Price .Currency}}{{else}}—{{end}}
+          {{if .Price}}{{.Price}}{{else}}—{{end}}
         </td>
         <td class="px-4 py-3">
           {{if gt .EvalScore 0.0}}
@@ -68,8 +68,8 @@
           {{end}}
         </td>
         <td class="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
-          {{if .EndTime.Valid}}
-          <span {{if .EndingSoon}}class="text-red-600 font-semibold"{{end}}>{{formatTime .EndTime.Int64}}</span>
+          {{if .EndTime}}
+          <span {{if .EndingSoon}}class="text-red-600 font-semibold"{{end}}>{{.EndTime}}</span>
           {{else}}—{{end}}
         </td>
         <td class="px-4 py-3">

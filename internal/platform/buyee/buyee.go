@@ -77,60 +77,55 @@ func (p *Platform) Search(ctx context.Context, q platform.Query) ([]platform.Lis
 
 	var listings []platform.Listing
 
-	doc.Find(".g-item-list .g-item, .itemList .item, [class*='itemCard'], [class*='g-item']").Each(func(_ int, s *goquery.Selection) {
-		l := platform.Listing{
-			Platform: "buyee",
-		}
+	doc.Find("li.itemCard").Each(func(_ int, s *goquery.Selection) {
+		l := platform.Listing{Platform: "buyee"}
 
-		// URL and external ID.
-		href, _ := s.Find("a").First().Attr("href")
+		// URL and external ID from the item name link.
+		href, _ := s.Find("div.itemCard__itemName a, div.g-thumbnail__outer a").First().Attr("href")
 		if href == "" {
-			href, _ = s.Attr("href")
+			return
 		}
-		if href != "" {
-			if !strings.HasPrefix(href, "http") {
-				href = baseURL + href
-			}
-			l.URL = href
-			// Extract external ID from path like /item/yahoo/auction/xxxxxx
-			parts := strings.Split(strings.TrimRight(href, "/"), "/")
-			if len(parts) > 0 {
-				l.ExternalID = parts[len(parts)-1]
-			}
+		if !strings.HasPrefix(href, "http") {
+			href = baseURL + href
 		}
-
+		l.URL = href
+		parts := strings.Split(strings.TrimRight(href, "/"), "/")
+		l.ExternalID = parts[len(parts)-1]
 		if l.ExternalID == "" {
 			return
 		}
 
 		// Title.
-		l.Title = strings.TrimSpace(s.Find("[class*='name'], [class*='title'], .g-item-name").First().Text())
-		if l.Title == "" {
-			l.Title = strings.TrimSpace(s.Find("a").First().Text())
-		}
+		l.Title = strings.TrimSpace(s.Find("div.itemCard__itemName a").First().Text())
 
-		// Price (JPY).
-		priceText := strings.TrimSpace(s.Find("[class*='price']").First().Text())
-		priceText = strings.NewReplacer("¥", "", ",", "", " ", "").Replace(priceText)
-		if f, err := strconv.ParseFloat(priceText, 64); err == nil {
-			l.Price = &f
+		// Price: first span.g-price = current price, format "6,000 YEN".
+		priceText := strings.TrimSpace(s.Find("span.g-price").First().Text())
+		if price := parseJPYPrice(priceText); price != nil {
+			l.Price = price
 			l.Currency = "JPY"
 		}
 
-		// Image.
-		imgSrc, _ := s.Find("img").First().Attr("src")
+		// Image: data-src on lazy-loaded thumbnail.
+		imgSrc, _ := s.Find("img.lazyLoadV2").First().Attr("data-src")
+		if imgSrc == "" {
+			imgSrc, _ = s.Find("img").First().Attr("src")
+		}
 		if imgSrc != "" {
 			l.ImageURLs = []string{imgSrc}
 		}
 
-		// End time (best-effort).
-		endText := strings.TrimSpace(s.Find("[class*='time'], [class*='end']").First().Text())
-		if t := parseJPTime(endText); t != nil {
-			l.EndTime = t
-		}
+		// End time from "Time Remaining" info item.
+		s.Find("li.itemCard__infoItem").Each(func(_ int, info *goquery.Selection) {
+			label := strings.TrimSpace(info.Find("span.g-title").Text())
+			if label == "Time Remaining" {
+				val := strings.TrimSpace(info.Find("span.g-text").Text())
+				if t := parseTimeRemaining(val); t != nil {
+					l.EndTime = t
+				}
+			}
+		})
 
 		raw, _ := json.Marshal(map[string]string{
-			"raw_title":  l.Title,
 			"raw_price":  priceText,
 			"source_url": l.URL,
 		})
@@ -177,33 +172,40 @@ func (p *Platform) GetListing(ctx context.Context, externalID string) (*platform
 	return l, nil
 }
 
-func parseJPTime(s string) *time.Time {
-	formats := []string{
-		"2006-01-02 15:04",
-		"01/02 15:04",
-		"1/2 15:04",
+// parseJPYPrice parses Buyee price strings like "6,000 YEN" or "13,500 YEN".
+func parseJPYPrice(s string) *float64 {
+	s = strings.NewReplacer(",", "", " ", "", "YEN", "", "¥", "").Replace(strings.TrimSpace(s))
+	if s == "" {
+		return nil
 	}
-	s = strings.TrimSpace(s)
-	for _, f := range formats {
-		t, err := time.ParseInLocation(f, s, time.FixedZone("JST", 9*3600))
-		if err == nil {
-			// If no year, assume current or next year.
-			if t.Year() == 0 {
-				now := time.Now()
-				t = t.AddDate(now.Year(), 0, 0)
-				if t.Before(now) {
-					t = t.AddDate(1, 0, 0)
-				}
-			}
-			return &t
-		}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return nil
 	}
-	return nil
+	return &f
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
+// parseTimeRemaining converts Buyee "5 day(s)" / "22 hour(s)" to an absolute time.
+func parseTimeRemaining(s string) *time.Time {
+	s = strings.ToLower(strings.TrimSpace(s))
+	var dur time.Duration
+	switch {
+	case strings.Contains(s, "day"):
+		if n, err := strconv.Atoi(strings.Fields(s)[0]); err == nil {
+			dur = time.Duration(n) * 24 * time.Hour
+		}
+	case strings.Contains(s, "hour"):
+		if n, err := strconv.Atoi(strings.Fields(s)[0]); err == nil {
+			dur = time.Duration(n) * time.Hour
+		}
+	case strings.Contains(s, "min"):
+		if n, err := strconv.Atoi(strings.Fields(s)[0]); err == nil {
+			dur = time.Duration(n) * time.Minute
+		}
 	}
-	return b
+	if dur == 0 {
+		return nil
+	}
+	t := time.Now().Add(dur)
+	return &t
 }

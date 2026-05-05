@@ -22,6 +22,7 @@ type Querier interface {
 	FinishScanRun(ctx context.Context, arg FinishScanRunParams) (ScanRun, error)
 	GetBid(ctx context.Context, id int64) (Bid, error)
 	GetEvaluation(ctx context.Context, arg GetEvaluationParams) (Evaluation, error)
+	GetImageCache(ctx context.Context, url string) (GetImageCacheRow, error)
 	GetLastNotificationSentAt(ctx context.Context, kind string) (int64, error)
 	GetListing(ctx context.Context, id int64) (Listing, error)
 	GetListingByExternalID(ctx context.Context, arg GetListingByExternalIDParams) (Listing, error)
@@ -37,8 +38,9 @@ type Querier interface {
 	ListListingsBySearch(ctx context.Context, arg ListListingsBySearchParams) ([]Listing, error)
 	ListListingsBySearchWithScore(ctx context.Context, arg ListListingsBySearchWithScoreParams) ([]ListListingsBySearchWithScoreRow, error)
 	ListNewSince(ctx context.Context, arg ListNewSinceParams) ([]Listing, error)
-	ListRecentListings(ctx context.Context, limit int64) ([]Listing, error)
+	ListRecentListings(ctx context.Context, limit int64) ([]ListRecentListingsRow, error)
 	ListRecentScanRuns(ctx context.Context, limit int64) ([]ListRecentScanRunsRow, error)
+	SetImageCache(ctx context.Context, arg SetImageCacheParams) error
 	UpdateBidResult(ctx context.Context, arg UpdateBidResultParams) (Bid, error)
 	UpdateListingStatus(ctx context.Context, arg UpdateListingStatusParams) error
 	UpdateSearch(ctx context.Context, arg UpdateSearchParams) (Search, error)

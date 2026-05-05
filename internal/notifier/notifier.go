@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"log/slog"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,7 +26,7 @@ type Notifier struct {
 }
 
 type DigestData struct {
-	Date    string
+	Date     string
 	Searches []SearchDigest
 }
 
@@ -36,17 +37,18 @@ type SearchDigest struct {
 }
 
 type ListingView struct {
-	Title     string
-	URL       string
-	Platform  string
-	Price     string
-	Score     float64
-	Reasoning string
-	EndTime   string
+	Title      string
+	URL        string
+	DarklyURL  string
+	Platform   string
+	Price      string
+	Score      float64
+	Reasoning  string
+	EndTime    string
 	EndingSoon bool
-	Condition string
-	Location  string
-	ImageURL  string
+	Condition  string
+	Location   string
+	ImageURL   string
 }
 
 func New(queries *dbgen.Queries, cfg *config.Config, log *slog.Logger) *Notifier {
@@ -116,6 +118,7 @@ func (n *Notifier) SendDigest(ctx context.Context) error {
 			lv := ListingView{
 				Title:     e.Title,
 				URL:       e.Url,
+				DarklyURL: n.listingURL(e.ListingID),
 				Platform:  e.Platform,
 				Score:     e.Score,
 				Reasoning: e.Reasoning,
@@ -141,7 +144,7 @@ func (n *Notifier) SendDigest(ctx context.Context) error {
 	}
 
 	subject := fmt.Sprintf("Darkly Digest — %s", data.Date)
-	body, err := n.renderTemplate("email/digest.html", data)
+	body, err := n.renderTemplate("digest.html", data)
 	if err != nil {
 		return fmt.Errorf("render digest: %w", err)
 	}
@@ -207,10 +210,11 @@ func (n *Notifier) CheckUrgent(ctx context.Context) error {
 	data := urgentData{}
 	for _, l := range actionable {
 		lv := ListingView{
-			Title:    l.Title,
-			URL:      l.Url,
-			Platform: l.Platform,
-			Location: l.Location,
+			Title:     l.Title,
+			URL:       l.Url,
+			DarklyURL: n.listingURL(l.ID),
+			Platform:  l.Platform,
+			Location:  l.Location,
 		}
 		if l.Price.Valid {
 			lv.Price = formatPrice(l.Price.Float64, l.Currency)
@@ -224,7 +228,7 @@ func (n *Notifier) CheckUrgent(ctx context.Context) error {
 	}
 
 	subject := fmt.Sprintf("⚠️ Darkly Alert — %d auction(s) ending soon", len(actionable))
-	body, err := n.renderTemplate("email/urgent.html", data)
+	body, err := n.renderTemplate("urgent.html", data)
 	if err != nil {
 		return fmt.Errorf("render urgent: %w", err)
 	}
@@ -258,6 +262,13 @@ func (n *Notifier) send(ctx context.Context, subject, htmlBody string) error {
 		return fmt.Errorf("sendmail: %w: %s", err, stderr.String())
 	}
 	return nil
+}
+
+func (n *Notifier) listingURL(id int64) string {
+	if n.cfg.SiteURL == "" {
+		return ""
+	}
+	return n.cfg.SiteURL + "/listings/" + strconv.FormatInt(id, 10)
 }
 
 func (n *Notifier) renderTemplate(name string, data any) (string, error) {

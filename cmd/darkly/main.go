@@ -17,17 +17,17 @@ import (
 	dbgen "github.com/nrhtr/darkly/internal/db/generated"
 	"github.com/nrhtr/darkly/internal/evaluator"
 	"github.com/nrhtr/darkly/internal/notifier"
+	"github.com/nrhtr/darkly/internal/platform"
 	"github.com/nrhtr/darkly/internal/platform/buyee"
 	"github.com/nrhtr/darkly/internal/platform/ebay"
 	"github.com/nrhtr/darkly/internal/platform/facebook"
 	"github.com/nrhtr/darkly/internal/platform/gumtree"
-	"github.com/nrhtr/darkly/internal/platform"
 	"github.com/nrhtr/darkly/internal/scanner"
 	"github.com/nrhtr/darkly/internal/web/handlers"
 )
 
 func main() {
-	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(log)
 
 	if err := run(log); err != nil {
@@ -120,6 +120,13 @@ func run(log *slog.Logger) error {
 	mux.HandleFunc("GET /bids", h.ListBids)
 	mux.HandleFunc("GET /scan-runs", h.ListScanRuns)
 	mux.HandleFunc("GET /scan-runs/partial", h.ScanRunsPartial)
+	mux.HandleFunc("GET /images/{hash}", h.ProxyImage)
+
+	if cfg.DevMode {
+		mux.HandleFunc("GET /debug/email/digest", h.DebugEmailDigest)
+		mux.HandleFunc("GET /debug/email/urgent", h.DebugEmailUrgent)
+		log.Info("dev mode enabled", "routes", []string{"/debug/email/digest", "/debug/email/urgent"})
+	}
 
 	srv := &http.Server{
 		Addr:         cfg.ListenAddr,

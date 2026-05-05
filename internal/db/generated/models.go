@@ -37,6 +37,13 @@ type Evaluation struct {
 	CreatedAt int64   `json:"created_at"`
 }
 
+type ImageCache struct {
+	Url         string `json:"url"`
+	Data        []byte `json:"data"`
+	ContentType string `json:"content_type"`
+	FetchedAt   int64  `json:"fetched_at"`
+}
+
 type Listing struct {
 	ID          int64           `json:"id"`
 	ExternalID  string          `json:"external_id"`

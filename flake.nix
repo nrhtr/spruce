@@ -4,13 +4,27 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    git-hooks = {
+      url = "github:cachix/git-hooks.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, git-hooks }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        pre-commit-check = git-hooks.lib.${system}.run {
+          src = ./.;
+          package = pkgs.prek;
+          hooks = {
+            govet.enable = true;
+            gofmt.enable = true;
+            markdownlint.enable = true;
+          };
+        };
       in {
+        checks.pre-commit-check = pre-commit-check;
         devShells.default = pkgs.mkShell {
           name = "darkly";
           packages = with pkgs; [
@@ -23,7 +37,7 @@
             chromium
           ];
 
-          shellHook = ''
+          shellHook = pre-commit-check.shellHook + ''
             export CGO_ENABLED=0
             if command -v chromium &>/dev/null; then
               export CHROMIUM_PATH="$(command -v chromium)"

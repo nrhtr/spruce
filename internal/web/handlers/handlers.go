@@ -2,9 +2,13 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -63,8 +67,9 @@ func parseTemplates() (map[string]*template.Template, error) {
 		"formatTime": func(epoch int64) string {
 			return time.Unix(epoch, 0).Format("2 Jan 06 3:04pm")
 		},
-		"inc": func(i int) int { return i + 1 },
-		"dec": func(i int) int { return i - 1 },
+		"inc":      func(i int) int { return i + 1 },
+		"dec":      func(i int) int { return i - 1 },
+		"proxyURL": ProxyURL,
 	}
 
 	sub, err := fs.Sub(web.TemplatesFS, "templates")
@@ -116,10 +121,10 @@ type DashboardStats struct {
 
 type ListingRow struct {
 	dbgen.Listing
-	Price     sql.NullFloat64
-	EvalScore float64
+	Price      sql.NullFloat64
+	EvalScore  float64
 	EndingSoon bool
-	EndTime   sql.NullInt64
+	EndTime    sql.NullInt64
 }
 
 func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
@@ -145,7 +150,8 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	var topListings []dashListing
 	for _, l := range recentListings {
-		dl := dashListing{Listing: l}
+		listing, score := convertRecentRow(l)
+		dl := dashListing{Listing: listing, Score: score}
 		if l.Price.Valid {
 			dl.Price = notifier.FormatPrice(l.Price, l.Currency)
 		}
@@ -374,10 +380,10 @@ func (h *Handler) TriggerScan(w http.ResponseWriter, r *http.Request) {
 // Listings
 
 type listingsFilter struct {
-	SearchID    int64
-	Platform    string
-	MinScore    float64
-	Page        int
+	SearchID int64
+	Platform string
+	MinScore float64
+	Page     int
 }
 
 func (h *Handler) ListListings(w http.ResponseWriter, r *http.Request) {
@@ -446,7 +452,8 @@ func (h *Handler) ListListings(w http.ResponseWriter, r *http.Request) {
 		}
 		total, _ = h.queries.CountTotalListings(ctx)
 		for _, l := range listings {
-			lr := listingRow{Listing: l}
+			listing, score := convertRecentRow(l)
+			lr := listingRow{Listing: listing, EvalScore: score}
 			if l.Price.Valid {
 				lr.Price = notifier.FormatPrice(l.Price, l.Currency)
 			}
@@ -468,15 +475,15 @@ func (h *Handler) ListListings(w http.ResponseWriter, r *http.Request) {
 
 	qs := buildQueryString(r, "page")
 	h.render(w, "listings", map[string]any{
-		"Listings":        rows,
-		"Searches":        searches,
-		"FilterSearchID":  f.SearchID,
-		"FilterPlatform":  f.Platform,
-		"FilterMinScore":  f.MinScore,
-		"Page":            f.Page,
-		"HasMore":         hasMore,
-		"Total":           total,
-		"QueryString":     qs,
+		"Listings":       rows,
+		"Searches":       searches,
+		"FilterSearchID": f.SearchID,
+		"FilterPlatform": f.Platform,
+		"FilterMinScore": f.MinScore,
+		"Page":           f.Page,
+		"HasMore":        hasMore,
+		"Total":          total,
+		"QueryString":    qs,
 	})
 }
 
@@ -674,6 +681,28 @@ func formatDuration(d time.Duration) string {
 	return strconv.Itoa(m) + "m"
 }
 
+func convertRecentRow(l dbgen.ListRecentListingsRow) (dbgen.Listing, float64) {
+	listing := dbgen.Listing{
+		ID: l.ID, ExternalID: l.ExternalID, Platform: l.Platform,
+		Title: l.Title, Description: l.Description, Price: l.Price,
+		Currency: l.Currency, Url: l.Url, ImageUrls: l.ImageUrls,
+		EndTime: l.EndTime, Condition: l.Condition, Location: l.Location,
+		RawData: l.RawData, Status: l.Status, FirstSeen: l.FirstSeen, LastSeen: l.LastSeen,
+	}
+	var score float64
+	switch v := l.EvalScore.(type) {
+	case float64:
+		if v > 0 {
+			score = v
+		}
+	case int64:
+		if v > 0 {
+			score = float64(v)
+		}
+	}
+	return listing, score
+}
+
 func convertScoredRow(l dbgen.ListListingsBySearchWithScoreRow) dbgen.Listing {
 	return dbgen.Listing{
 		ID:          l.ID,
@@ -696,6 +725,69 @@ func convertScoredRow(l dbgen.ListListingsBySearchWithScoreRow) dbgen.Listing {
 }
 
 // EmailTemplates parses and returns the email template set for use by the notifier.
+// ProxyImage fetches an external image URL, caches it in SQLite, and serves it.
+// Path: /images/{hash} where hash = SHA-256 hex of the original URL (passed as ?url=).
+// Templates call proxyURL(rawURL) to get the /images/<hash> path.
+func (h *Handler) ProxyImage(w http.ResponseWriter, r *http.Request) {
+	rawURL := r.URL.Query().Get("url")
+	if rawURL == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Check cache first.
+	row, err := h.queries.GetImageCache(r.Context(), rawURL)
+	if err == nil {
+		w.Header().Set("Content-Type", row.ContentType)
+		w.Header().Set("Cache-Control", "public, max-age=604800")
+		w.Write(row.Data)
+		return
+	}
+
+	// Fetch from origin.
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, rawURL, nil)
+	if err != nil {
+		http.Error(w, "bad url", http.StatusBadRequest)
+		return
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible)")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		http.Error(w, "fetch failed", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20)) // 2 MB max
+	if err != nil {
+		http.Error(w, "read failed", http.StatusBadGateway)
+		return
+	}
+
+	ct := resp.Header.Get("Content-Type")
+	if ct == "" {
+		ct = "image/jpeg"
+	}
+
+	// Store in cache (best-effort).
+	h.queries.SetImageCache(r.Context(), dbgen.SetImageCacheParams{
+		Url: rawURL, Data: data, ContentType: ct,
+	})
+
+	w.Header().Set("Content-Type", ct)
+	w.Header().Set("Cache-Control", "public, max-age=604800")
+	w.Write(data)
+}
+
+// ProxyURL returns the local proxy path for an external image URL.
+func ProxyURL(rawURL string) string {
+	if rawURL == "" {
+		return ""
+	}
+	h := sha256.Sum256([]byte(rawURL))
+	return fmt.Sprintf("/images/%s?url=%s", hex.EncodeToString(h[:]), rawURL)
+}
+
 func (h *Handler) EmailTemplates() *template.Template {
 	sub, err := fs.Sub(web.TemplatesFS, "templates")
 	if err != nil {
@@ -706,4 +798,55 @@ func (h *Handler) EmailTemplates() *template.Template {
 		return nil
 	}
 	return t
+}
+
+func (h *Handler) DebugEmailDigest(w http.ResponseWriter, r *http.Request) {
+	tmpl := h.EmailTemplates()
+	if tmpl == nil {
+		http.Error(w, "email templates unavailable", 500)
+		return
+	}
+	data := map[string]any{
+		"Date": "Tuesday, 6 May 2026",
+		"Searches": []map[string]any{
+			{
+				"Name":     "NEC PC8801 Keyboard",
+				"NewCount": 3,
+				"TopListings": []notifier.ListingView{
+					{Title: "NEC PC-8801mkIISR キーボード ジャンク【20", URL: "#", DarklyURL: "#", Platform: "buyee", Price: "¥5,060", Score: 7.5, Reasoning: "Strong match for the PC-8801mkIISR. Junk condition raises questions, but price is very reasonable.", EndTime: "Wed 7 May 8:30pm", EndingSoon: true, Condition: "junk"},
+					{Title: "NEC PC-8801 FH FA FE MH MA MA2 MC VA VA2 VA3用 TYPE A キーボード 中古", URL: "#", DarklyURL: "#", Platform: "buyee", Price: "¥19,800", Score: 7.5, Reasoning: "Type A keyboard covering multiple PC-8801 variants. Used condition is preferable to junk.", EndTime: "Thu 8 May 9:30am", Condition: "used"},
+					{Title: "希少!! 通電OK NEC PC-8801 キーボード 当時物 昭和レトロ", URL: "#", Platform: "buyee", Price: "¥15,780", Score: 6.5, Reasoning: "Powers on. Original PC-8801 (not mkII), so switch variant uncertain.", EndTime: "Wed 7 May 8:30pm"},
+				},
+			},
+			{
+				"Name":     "Vintage Keyboards",
+				"NewCount": 1,
+				"TopListings": []notifier.ListingView{
+					{Title: "IBM Model M Space Saver — Near Mint w/ original box", URL: "#", DarklyURL: "#", Platform: "ebay", Price: "A$280", Score: 8.5, Reasoning: "Near-mint with original box is rare. Price is high but fair for condition. Local Melbourne seller.", Location: "Melbourne, VIC", Condition: "near mint"},
+				},
+			},
+		},
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := tmpl.ExecuteTemplate(w, "digest.html", data); err != nil {
+		h.log.Error("debug digest template", "error", err)
+	}
+}
+
+func (h *Handler) DebugEmailUrgent(w http.ResponseWriter, r *http.Request) {
+	tmpl := h.EmailTemplates()
+	if tmpl == nil {
+		http.Error(w, "email templates unavailable", 500)
+		return
+	}
+	data := map[string]any{
+		"Listings": []notifier.ListingView{
+			{Title: "NEC PC-8801mkIISR キーボード ジャンク【20", URL: "#", DarklyURL: "#", Platform: "buyee", Price: "¥5,060", EndTime: "Wed 7 May 8:30pm", EndingSoon: true},
+			{Title: "希少!! 通電OK NEC PC-8801 キーボード 当時物 昭和レトロ 激レア", URL: "#", Platform: "buyee", Price: "¥15,780", EndTime: "Wed 7 May 8:30pm", EndingSoon: true},
+		},
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := tmpl.ExecuteTemplate(w, "urgent.html", data); err != nil {
+		h.log.Error("debug urgent template", "error", err)
+	}
 }

@@ -353,18 +353,43 @@ func (q *Queries) ListNewSince(ctx context.Context, arg ListNewSinceParams) ([]L
 }
 
 const listRecentListings = `-- name: ListRecentListings :many
-SELECT id, external_id, platform, title, description, price, currency, url, image_urls, end_time, condition, location, raw_data, status, first_seen, last_seen FROM listings ORDER BY first_seen DESC LIMIT ?
+SELECT l.id, l.external_id, l.platform, l.title, l.description, l.price, l.currency, l.url, l.image_urls, l.end_time, l.condition, l.location, l.raw_data, l.status, l.first_seen, l.last_seen, COALESCE(
+    (SELECT e.score FROM evaluations e WHERE e.listing_id = l.id ORDER BY e.created_at DESC LIMIT 1),
+    -1
+) AS eval_score
+FROM listings l
+ORDER BY l.first_seen DESC LIMIT ?
 `
 
-func (q *Queries) ListRecentListings(ctx context.Context, limit int64) ([]Listing, error) {
+type ListRecentListingsRow struct {
+	ID          int64           `json:"id"`
+	ExternalID  string          `json:"external_id"`
+	Platform    string          `json:"platform"`
+	Title       string          `json:"title"`
+	Description string          `json:"description"`
+	Price       sql.NullFloat64 `json:"price"`
+	Currency    string          `json:"currency"`
+	Url         string          `json:"url"`
+	ImageUrls   string          `json:"image_urls"`
+	EndTime     sql.NullInt64   `json:"end_time"`
+	Condition   string          `json:"condition"`
+	Location    string          `json:"location"`
+	RawData     string          `json:"raw_data"`
+	Status      string          `json:"status"`
+	FirstSeen   int64           `json:"first_seen"`
+	LastSeen    int64           `json:"last_seen"`
+	EvalScore   interface{}     `json:"eval_score"`
+}
+
+func (q *Queries) ListRecentListings(ctx context.Context, limit int64) ([]ListRecentListingsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listRecentListings, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Listing
+	var items []ListRecentListingsRow
 	for rows.Next() {
-		var i Listing
+		var i ListRecentListingsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ExternalID,
@@ -382,6 +407,7 @@ func (q *Queries) ListRecentListings(ctx context.Context, limit int64) ([]Listin
 			&i.Status,
 			&i.FirstSeen,
 			&i.LastSeen,
+			&i.EvalScore,
 		); err != nil {
 			return nil, err
 		}
@@ -418,7 +444,11 @@ ON CONFLICT(platform, external_id) DO UPDATE SET
     title       = excluded.title,
     description = excluded.description,
     price       = excluded.price,
+    currency    = excluded.currency,
+    image_urls  = excluded.image_urls,
     end_time    = excluded.end_time,
+    condition   = excluded.condition,
+    location    = excluded.location,
     status      = excluded.status,
     raw_data    = excluded.raw_data,
     last_seen   = unixepoch()
