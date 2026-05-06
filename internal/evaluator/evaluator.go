@@ -10,9 +10,9 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
-	"github.com/nrhtr/darkly/internal/config"
-	dbgen "github.com/nrhtr/darkly/internal/db/generated"
-	"github.com/nrhtr/darkly/internal/platform"
+	"github.com/nrhtr/spruce/internal/config"
+	dbgen "github.com/nrhtr/spruce/internal/db/generated"
+	"github.com/nrhtr/spruce/internal/platform"
 )
 
 const systemPrompt = `You are an expert auction evaluator helping a buyer identify high-quality deals on vintage electronics and other items.

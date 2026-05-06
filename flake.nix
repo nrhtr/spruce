@@ -1,5 +1,5 @@
 {
-  description = "darkly — auction deal-hunting tool";
+  description = "spruce — auction deal-hunting tool";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -26,7 +26,7 @@
       in {
         checks.pre-commit-check = pre-commit-check;
         devShells.default = pkgs.mkShell {
-          name = "darkly";
+          name = "spruce";
           packages = with pkgs; [
             go
             gopls

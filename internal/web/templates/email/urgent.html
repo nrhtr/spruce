@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Darkly Alert</title>
+  <title>Spruce Alert</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, sans-serif; background: #fef2f2; color: #1f2937; padding: 24px 16px; }
@@ -18,7 +18,7 @@
     .card-row { display: flex; gap: 20px; align-items: center; margin-top: 12px; }
     .card-price { font-size: 18px; font-weight: 800; color: #059669; }
     .card-end { font-size: 13px; font-weight: 700; color: #dc2626; }
-    .darkly-link { display: inline-block; margin-top: 6px; font-size: 11px; color: #9ca3af; text-decoration: none; }
+    .spruce-link { display: inline-block; margin-top: 6px; font-size: 11px; color: #9ca3af; text-decoration: none; }
     .divider { border: none; border-top: 1px solid #fee2e2; margin: 24px 0; }
     .footer { font-size: 11px; color: #d1d5db; text-align: center; }
   </style>
@@ -26,7 +26,7 @@
 <body>
   <div class="wrap">
     <div class="header">
-      <h1>⚠ Darkly Alert</h1>
+      <h1>⚠ Spruce Alert</h1>
       <p>Auctions ending soon — action required</p>
     </div>
     <div class="body">
@@ -39,12 +39,12 @@
           {{if .Price}}<div class="card-price">{{.Price}}</div>{{end}}
           <div class="card-end">Ends {{.EndTime}}</div>
         </div>
-        {{if .DarklyURL}}<a href="{{.DarklyURL}}" class="darkly-link">View in Darkly →</a>{{end}}
+        {{if .SpruceURL}}<a href="{{.SpruceURL}}" class="spruce-link">View in Spruce →</a>{{end}}
       </div>
       {{end}}
 
       <hr class="divider">
-      <p class="footer">Darkly · you have not placed a bid on these items</p>
+      <p class="footer">Spruce · you have not placed a bid on these items</p>
     </div>
   </div>
 </body>

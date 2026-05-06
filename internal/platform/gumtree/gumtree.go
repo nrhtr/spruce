@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/nrhtr/darkly/internal/platform"
+	"github.com/nrhtr/spruce/internal/platform"
 )
 
 const baseURL = "https://www.gumtree.com.au"

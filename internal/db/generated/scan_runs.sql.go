@@ -135,6 +135,33 @@ func (q *Queries) ListRecentScanRuns(ctx context.Context, limit int64) ([]ListRe
 	return items, nil
 }
 
+const listRunningSearchIDs = `-- name: ListRunningSearchIDs :many
+SELECT DISTINCT search_id FROM scan_runs WHERE status = 'running'
+`
+
+func (q *Queries) ListRunningSearchIDs(ctx context.Context) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, listRunningSearchIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var search_id int64
+		if err := rows.Scan(&search_id); err != nil {
+			return nil, err
+		}
+		items = append(items, search_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listScanRunsPaged = `-- name: ListScanRunsPaged :many
 SELECT sr.id, sr.search_id, sr.platform, sr.started_at, sr.finished_at, sr.new_items, sr.errors, sr.status, s.name AS search_name
 FROM scan_runs sr

@@ -12,18 +12,18 @@ import (
 
 	"github.com/robfig/cron/v3"
 
-	"github.com/nrhtr/darkly/internal/config"
-	"github.com/nrhtr/darkly/internal/db"
-	dbgen "github.com/nrhtr/darkly/internal/db/generated"
-	"github.com/nrhtr/darkly/internal/evaluator"
-	"github.com/nrhtr/darkly/internal/notifier"
-	"github.com/nrhtr/darkly/internal/platform"
-	"github.com/nrhtr/darkly/internal/platform/buyee"
-	"github.com/nrhtr/darkly/internal/platform/ebay"
-	"github.com/nrhtr/darkly/internal/platform/facebook"
-	"github.com/nrhtr/darkly/internal/platform/gumtree"
-	"github.com/nrhtr/darkly/internal/scanner"
-	"github.com/nrhtr/darkly/internal/web/handlers"
+	"github.com/nrhtr/spruce/internal/config"
+	"github.com/nrhtr/spruce/internal/db"
+	dbgen "github.com/nrhtr/spruce/internal/db/generated"
+	"github.com/nrhtr/spruce/internal/evaluator"
+	"github.com/nrhtr/spruce/internal/notifier"
+	"github.com/nrhtr/spruce/internal/platform"
+	"github.com/nrhtr/spruce/internal/platform/buyee"
+	"github.com/nrhtr/spruce/internal/platform/ebay"
+	"github.com/nrhtr/spruce/internal/platform/facebook"
+	"github.com/nrhtr/spruce/internal/platform/gumtree"
+	"github.com/nrhtr/spruce/internal/scanner"
+	"github.com/nrhtr/spruce/internal/web/handlers"
 )
 
 func main() {
@@ -109,6 +109,7 @@ func run(log *slog.Logger) error {
 	mux.HandleFunc("GET /{$}", h.Dashboard)
 	mux.HandleFunc("GET /searches", h.ListSearches)
 	mux.HandleFunc("GET /searches/new", h.NewSearchForm)
+	mux.HandleFunc("GET /searches/partial", h.SearchesPartial)
 	mux.HandleFunc("POST /searches", h.CreateSearch)
 	mux.HandleFunc("GET /searches/{id}/edit", h.EditSearchForm)
 	mux.HandleFunc("POST /searches/{id}", h.UpdateSearch)

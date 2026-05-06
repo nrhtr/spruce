@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	dbgen "github.com/nrhtr/darkly/internal/db/generated"
-	"github.com/nrhtr/darkly/internal/evaluator"
-	"github.com/nrhtr/darkly/internal/platform"
+	dbgen "github.com/nrhtr/spruce/internal/db/generated"
+	"github.com/nrhtr/spruce/internal/evaluator"
+	"github.com/nrhtr/spruce/internal/platform"
 )
 
 type Scanner struct {

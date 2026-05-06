@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Darkly Digest</title>
+  <title>Spruce Digest</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, sans-serif; background: #f3f4f6; color: #1f2937; padding: 24px 16px; }
@@ -25,7 +25,7 @@
     .end-normal { color: #6b7280; }
     .card-score { margin-top: 8px; font-size: 12px; color: #6b7280; line-height: 1.5; }
     .score-num { color: #4f46e5; font-weight: 700; }
-    .darkly-link { display: inline-block; margin-top: 5px; font-size: 11px; color: #9ca3af; text-decoration: none; }
+    .spruce-link { display: inline-block; margin-top: 5px; font-size: 11px; color: #9ca3af; text-decoration: none; }
     .divider { border: none; border-top: 1px solid #f3f4f6; margin: 24px 0; }
     .footer { font-size: 11px; color: #d1d5db; text-align: center; }
   </style>
@@ -33,7 +33,7 @@
 <body>
   <div class="wrap">
     <div class="header">
-      <h1>darkly</h1>
+      <h1>spruce</h1>
       <p>Daily Digest — {{.Date}}</p>
     </div>
     <div class="body">
@@ -49,7 +49,7 @@
             <div>
               <a href="{{.URL}}" class="card-title">{{.Title}}</a>
               <p class="card-meta">{{.Platform}}{{if .Condition}} · {{.Condition}}{{end}}{{if .Location}} · {{.Location}}{{end}}</p>
-              {{if .DarklyURL}}<a href="{{.DarklyURL}}" class="darkly-link">View in Darkly →</a>{{end}}
+              {{if .SpruceURL}}<a href="{{.SpruceURL}}" class="spruce-link">View in Spruce →</a>{{end}}
             </div>
             {{if .Price}}<div class="card-price">{{.Price}}</div>{{end}}
           </div>
@@ -67,7 +67,7 @@
       {{end}}
 
       <hr class="divider">
-      <p class="footer">Darkly · your personal deal-hunting instance</p>
+      <p class="footer">Spruce · your personal deal-hunting instance</p>
     </div>
   </div>
 </body>

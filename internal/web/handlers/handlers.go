@@ -15,10 +15,10 @@ import (
 	"strconv"
 	"time"
 
-	dbgen "github.com/nrhtr/darkly/internal/db/generated"
-	"github.com/nrhtr/darkly/internal/notifier"
-	"github.com/nrhtr/darkly/internal/scanner"
-	"github.com/nrhtr/darkly/internal/web"
+	dbgen "github.com/nrhtr/spruce/internal/db/generated"
+	"github.com/nrhtr/spruce/internal/notifier"
+	"github.com/nrhtr/spruce/internal/scanner"
+	"github.com/nrhtr/spruce/internal/web"
 )
 
 type Handler struct {
@@ -215,23 +215,47 @@ type searchView struct {
 	dbgen.Search
 	PlatformList []string
 	ListingCount int64
+	IsScanning   bool
 }
 
-func (h *Handler) ListSearches(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+func (h *Handler) buildSearchViews(ctx context.Context) ([]searchView, error) {
 	searches, err := h.queries.ListAllSearches(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
+	}
+	runningIDs, _ := h.queries.ListRunningSearchIDs(ctx)
+	scanning := make(map[int64]bool, len(runningIDs))
+	for _, id := range runningIDs {
+		scanning[id] = true
 	}
 	var views []searchView
 	for _, s := range searches {
 		var pl []string
 		json.Unmarshal([]byte(s.Platforms), &pl)
 		count, _ := h.queries.CountListingsBySearch(ctx, s.ID)
-		views = append(views, searchView{Search: s, PlatformList: pl, ListingCount: count})
+		views = append(views, searchView{Search: s, PlatformList: pl, ListingCount: count, IsScanning: scanning[s.ID]})
+	}
+	return views, nil
+}
+
+func (h *Handler) ListSearches(w http.ResponseWriter, r *http.Request) {
+	views, err := h.buildSearchViews(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	h.render(w, "searches", map[string]any{"Searches": views})
+}
+
+func (h *Handler) SearchesPartial(w http.ResponseWriter, r *http.Request) {
+	views, _ := h.buildSearchViews(r.Context())
+	tmpl, ok := h.tmpls["searches"]
+	if !ok {
+		http.Error(w, "template not found", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	tmpl.ExecuteTemplate(w, "searches_rows", map[string]any{"Searches": views})
 }
 
 func (h *Handler) NewSearchForm(w http.ResponseWriter, r *http.Request) {

@@ -1,4 +1,4 @@
-module github.com/nrhtr/darkly
+module github.com/nrhtr/spruce
 
 go 1.25.7
 

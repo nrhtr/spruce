@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/nrhtr/darkly/internal/platform"
+	"github.com/nrhtr/spruce/internal/platform"
 )
 
 // Platform is a stub. Facebook Marketplace has no public API.

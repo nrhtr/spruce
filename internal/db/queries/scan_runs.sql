@@ -24,3 +24,6 @@ LIMIT ? OFFSET ?;
 
 -- name: CountScanRuns :one
 SELECT COUNT(*) FROM scan_runs;
+
+-- name: ListRunningSearchIDs :many
+SELECT DISTINCT search_id FROM scan_runs WHERE status = 'running';

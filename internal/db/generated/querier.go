@@ -42,6 +42,7 @@ type Querier interface {
 	ListNewSince(ctx context.Context, arg ListNewSinceParams) ([]Listing, error)
 	ListRecentListings(ctx context.Context, limit int64) ([]ListRecentListingsRow, error)
 	ListRecentScanRuns(ctx context.Context, limit int64) ([]ListRecentScanRunsRow, error)
+	ListRunningSearchIDs(ctx context.Context) ([]int64, error)
 	ListScanRunsPaged(ctx context.Context, arg ListScanRunsPagedParams) ([]ListScanRunsPagedRow, error)
 	SetImageCache(ctx context.Context, arg SetImageCacheParams) error
 	UpdateBidResult(ctx context.Context, arg UpdateBidResultParams) (Bid, error)

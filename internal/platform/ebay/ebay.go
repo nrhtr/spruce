@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nrhtr/darkly/internal/platform"
+	"github.com/nrhtr/spruce/internal/platform"
 )
 
 const (
@@ -27,9 +27,9 @@ type Platform struct {
 	marketplace  string
 	httpClient   *http.Client
 
-	tokenMu   sync.Mutex
-	token     string
-	tokenExp  time.Time
+	tokenMu  sync.Mutex
+	token    string
+	tokenExp time.Time
 }
 
 func New(clientID, clientSecret, marketplace string) *Platform {
@@ -94,13 +94,13 @@ type searchResponse struct {
 }
 
 type itemSummary struct {
-	ItemID       string `json:"itemId"`
-	Title        string `json:"title"`
-	ItemWebURL   string `json:"itemWebUrl"`
-	ShortDesc    string `json:"shortDescription"`
-	Condition    string `json:"condition"`
-	ItemEndDate  string `json:"itemEndDate"`
-	Price        struct {
+	ItemID      string `json:"itemId"`
+	Title       string `json:"title"`
+	ItemWebURL  string `json:"itemWebUrl"`
+	ShortDesc   string `json:"shortDescription"`
+	Condition   string `json:"condition"`
+	ItemEndDate string `json:"itemEndDate"`
+	Price       struct {
 		Value    string `json:"value"`
 		Currency string `json:"currency"`
 	} `json:"price"`
@@ -116,7 +116,7 @@ type itemSummary struct {
 
 func (p *Platform) Search(ctx context.Context, q platform.Query) ([]platform.Listing, error) {
 	if p.clientID == "" {
-		return nil, fmt.Errorf("ebay: no credentials configured (set DARKLY_EBAY_CLIENT_ID / DARKLY_EBAY_CLIENT_SECRET)")
+		return nil, fmt.Errorf("ebay: no credentials configured (set SPRUCE_EBAY_CLIENT_ID / SPRUCE_EBAY_CLIENT_SECRET)")
 	}
 
 	token, err := p.getToken(ctx)

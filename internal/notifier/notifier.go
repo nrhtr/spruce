@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nrhtr/darkly/internal/config"
-	dbgen "github.com/nrhtr/darkly/internal/db/generated"
+	"github.com/nrhtr/spruce/internal/config"
+	dbgen "github.com/nrhtr/spruce/internal/db/generated"
 )
 
 type Notifier struct {
