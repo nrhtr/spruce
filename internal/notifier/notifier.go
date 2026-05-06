@@ -8,13 +8,12 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
-	"os/exec"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/nrhtr/spruce/internal/config"
 	dbgen "github.com/nrhtr/spruce/internal/db/generated"
+	"github.com/nrhtr/spruce/internal/email"
 )
 
 type Notifier struct {
@@ -250,18 +249,8 @@ func (n *Notifier) CheckUrgent(ctx context.Context) error {
 	return nil
 }
 
-func (n *Notifier) send(ctx context.Context, subject, htmlBody string) error {
-	msg := fmt.Sprintf("To: %s\r\nFrom: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",
-		n.cfg.EmailTo, n.cfg.EmailFrom, subject, htmlBody)
-
-	cmd := exec.CommandContext(ctx, "/usr/sbin/sendmail", "-t")
-	cmd.Stdin = strings.NewReader(msg)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("sendmail: %w: %s", err, stderr.String())
-	}
-	return nil
+func (n *Notifier) send(_ context.Context, subject, htmlBody string) error {
+	return email.Send(n.cfg, n.cfg.EmailTo, subject, htmlBody)
 }
 
 func (n *Notifier) listingURL(id int64) string {

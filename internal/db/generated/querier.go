@@ -17,10 +17,13 @@ type Querier interface {
 	CountTotalListings(ctx context.Context) (int64, error)
 	CreateBid(ctx context.Context, arg CreateBidParams) (Bid, error)
 	CreateEmailNotification(ctx context.Context, arg CreateEmailNotificationParams) (EmailNotification, error)
+	CreateMagicLink(ctx context.Context, token string) error
 	CreateScanRun(ctx context.Context, arg CreateScanRunParams) (ScanRun, error)
 	CreateSearch(ctx context.Context, arg CreateSearchParams) (Search, error)
+	CreateSession(ctx context.Context, token string) error
 	DeactivateSearch(ctx context.Context, id int64) error
 	DeleteSearch(ctx context.Context, id int64) error
+	FailStaleRuns(ctx context.Context) (sql.Result, error)
 	FinishScanRun(ctx context.Context, arg FinishScanRunParams) (ScanRun, error)
 	GetBid(ctx context.Context, id int64) (Bid, error)
 	GetEvaluation(ctx context.Context, arg GetEvaluationParams) (Evaluation, error)
@@ -51,6 +54,8 @@ type Querier interface {
 	UpdateSearch(ctx context.Context, arg UpdateSearchParams) (Search, error)
 	UpsertEvaluation(ctx context.Context, arg UpsertEvaluationParams) (Evaluation, error)
 	UpsertListing(ctx context.Context, arg UpsertListingParams) (Listing, error)
+	VerifyMagicLink(ctx context.Context, token string) (sql.Result, error)
+	VerifySession(ctx context.Context, token string) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

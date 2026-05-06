@@ -74,7 +74,7 @@ func run(log *slog.Logger) error {
 	notif := notifier.New(queries, cfg, log)
 
 	// Load email templates into the notifier.
-	h, err := handlers.New(sqlDB, queries, scnr, log, loc)
+	h, err := handlers.New(sqlDB, queries, scnr, log, loc, cfg)
 	if err != nil {
 		return fmt.Errorf("parse templates: %w", err)
 	}
@@ -106,29 +106,41 @@ func run(log *slog.Logger) error {
 
 	// HTTP server.
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", h.Dashboard)
-	mux.HandleFunc("GET /searches", h.ListSearches)
-	mux.HandleFunc("GET /searches/new", h.NewSearchForm)
-	mux.HandleFunc("GET /searches/partial", h.SearchesPartial)
-	mux.HandleFunc("POST /searches", h.CreateSearch)
-	mux.HandleFunc("GET /searches/{id}/edit", h.EditSearchForm)
-	mux.HandleFunc("POST /searches/{id}", h.UpdateSearch)
-	mux.HandleFunc("POST /searches/{id}/scan", h.TriggerScan)
-	mux.HandleFunc("POST /searches/{id}/delete", h.DeleteSearch)
-	mux.HandleFunc("GET /listings", h.ListListings)
-	mux.HandleFunc("GET /listings/{id}", h.GetListing)
-	mux.HandleFunc("POST /listings/{id}/mute", h.MuteListing)
-	mux.HandleFunc("POST /listings/{id}/unmute", h.UnmuteListing)
-	mux.HandleFunc("POST /listings/{id}/bids", h.CreateBid)
-	mux.HandleFunc("POST /bids/{id}", h.UpdateBid)
-	mux.HandleFunc("GET /bids", h.ListBids)
-	mux.HandleFunc("GET /scan-runs", h.ListScanRuns)
-	mux.HandleFunc("GET /scan-runs/partial", h.ScanRunsPartial)
-	mux.HandleFunc("GET /images/{hash}", h.ProxyImage)
+
+	// Public auth routes.
+	mux.HandleFunc("GET /login", h.LoginGet)
+	mux.HandleFunc("POST /login", h.LoginPost)
+	mux.HandleFunc("GET /auth/verify", h.AuthVerify)
+	mux.HandleFunc("POST /logout", h.Logout)
+
+	// Protected routes — wrap each with RequireAuth.
+	auth := func(fn http.HandlerFunc) http.HandlerFunc {
+		return h.RequireAuth(fn).ServeHTTP
+	}
+
+	mux.HandleFunc("GET /{$}", auth(h.Dashboard))
+	mux.HandleFunc("GET /searches", auth(h.ListSearches))
+	mux.HandleFunc("GET /searches/new", auth(h.NewSearchForm))
+	mux.HandleFunc("GET /searches/partial", auth(h.SearchesPartial))
+	mux.HandleFunc("POST /searches", auth(h.CreateSearch))
+	mux.HandleFunc("GET /searches/{id}/edit", auth(h.EditSearchForm))
+	mux.HandleFunc("POST /searches/{id}", auth(h.UpdateSearch))
+	mux.HandleFunc("POST /searches/{id}/scan", auth(h.TriggerScan))
+	mux.HandleFunc("POST /searches/{id}/delete", auth(h.DeleteSearch))
+	mux.HandleFunc("GET /listings", auth(h.ListListings))
+	mux.HandleFunc("GET /listings/{id}", auth(h.GetListing))
+	mux.HandleFunc("POST /listings/{id}/mute", auth(h.MuteListing))
+	mux.HandleFunc("POST /listings/{id}/unmute", auth(h.UnmuteListing))
+	mux.HandleFunc("POST /listings/{id}/bids", auth(h.CreateBid))
+	mux.HandleFunc("POST /bids/{id}", auth(h.UpdateBid))
+	mux.HandleFunc("GET /bids", auth(h.ListBids))
+	mux.HandleFunc("GET /scan-runs", auth(h.ListScanRuns))
+	mux.HandleFunc("GET /scan-runs/partial", auth(h.ScanRunsPartial))
+	mux.HandleFunc("GET /images/{hash}", auth(h.ProxyImage))
 
 	if cfg.DevMode {
-		mux.HandleFunc("GET /debug/email/digest", h.DebugEmailDigest)
-		mux.HandleFunc("GET /debug/email/urgent", h.DebugEmailUrgent)
+		mux.HandleFunc("GET /debug/email/digest", auth(h.DebugEmailDigest))
+		mux.HandleFunc("GET /debug/email/urgent", auth(h.DebugEmailUrgent))
 		log.Info("dev mode enabled", "routes", []string{"/debug/email/digest", "/debug/email/urgent"})
 	}
 

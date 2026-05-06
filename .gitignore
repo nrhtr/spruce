@@ -1,7 +1,5 @@
-darkly.db*
 spruce.db*
 /.claude
-/darkly
 *.log
 .envrc
 .pre-commit-config.yaml

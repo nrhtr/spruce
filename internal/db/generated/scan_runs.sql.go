@@ -47,6 +47,16 @@ func (q *Queries) CreateScanRun(ctx context.Context, arg CreateScanRunParams) (S
 	return i, err
 }
 
+const failStaleRuns = `-- name: FailStaleRuns :execresult
+UPDATE scan_runs
+SET status = 'failed', finished_at = unixepoch(), errors = 'interrupted: server restarted'
+WHERE status = 'running'
+`
+
+func (q *Queries) FailStaleRuns(ctx context.Context) (sql.Result, error) {
+	return q.db.ExecContext(ctx, failStaleRuns)
+}
+
 const finishScanRun = `-- name: FinishScanRun :one
 UPDATE scan_runs
 SET finished_at = unixepoch(), new_items = ?, errors = ?, status = ?

@@ -27,3 +27,8 @@ SELECT COUNT(*) FROM scan_runs;
 
 -- name: ListRunningSearchIDs :many
 SELECT DISTINCT search_id FROM scan_runs WHERE status = 'running';
+
+-- name: FailStaleRuns :execresult
+UPDATE scan_runs
+SET status = 'failed', finished_at = unixepoch(), errors = 'interrupted: server restarted'
+WHERE status = 'running';

@@ -27,12 +27,27 @@ func New(db *sql.DB, queries *dbgen.Queries, platforms []platform.Platform, eval
 	for _, p := range platforms {
 		pm[p.Name()] = p
 	}
-	return &Scanner{
+	s := &Scanner{
 		db:        db,
 		queries:   queries,
 		platforms: pm,
 		evaluator: eval,
 		log:       log,
+	}
+	s.cleanupStaleRuns()
+	return s
+}
+
+// cleanupStaleRuns marks any scan_runs left in 'running' state as failed.
+// These are orphans from a previous process that was killed mid-scan.
+func (s *Scanner) cleanupStaleRuns() {
+	res, err := s.queries.FailStaleRuns(context.Background())
+	if err != nil {
+		s.log.Warn("cleanup stale scan runs", "error", err)
+		return
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		s.log.Warn("marked stale scan runs as failed", "count", n)
 	}
 }
 

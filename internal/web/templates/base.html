@@ -17,11 +17,14 @@
 </head>
 <body class="bg-gray-100 min-h-screen text-gray-900 text-sm">
   <nav class="bg-gray-900 text-gray-100 px-6 py-3 flex items-center gap-6 shadow">
-    <a href="/" class="font-bold text-lg tracking-tight text-white">spruce</a>
+    <a href="/" class="font-bold text-lg tracking-tight text-white" style="position:relative;display:inline-block">spruce<span style="position:absolute;width:9px;height:9px;background:white;left:55px;bottom:23px;"></span></a>
     <a href="/searches" class="hover:text-white text-gray-400 transition-colors">Searches</a>
     <a href="/listings" class="hover:text-white text-gray-400 transition-colors">Listings</a>
     <a href="/bids" class="hover:text-white text-gray-400 transition-colors">Bids</a>
     <a href="/scan-runs" class="hover:text-white text-gray-400 transition-colors">Scan Log</a>
+    <form method="POST" action="/logout" class="ml-auto">
+      <button type="submit" class="text-gray-400 hover:text-white text-sm transition-colors">Log out</button>
+    </form>
   </nav>
   <main class="max-w-6xl mx-auto px-4 py-6">
     {{block "content" .}}{{end}}

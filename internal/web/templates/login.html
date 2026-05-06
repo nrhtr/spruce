@@ -1,0 +1,23 @@
+{{define "title"}}Login — Spruce{{end}}
+{{define "content"}}
+<div class="min-h-[60vh] flex items-center justify-center">
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8 w-full max-w-sm text-center">
+    <div class="mb-6">
+      <span class="font-bold text-2xl tracking-tight text-gray-900" style="position:relative;display:inline-block">spruce<span style="position:absolute;width:9px;height:9px;background:#111827;left:55px;bottom:23px;"></span></span>
+    </div>
+
+    {{if .Sent}}
+    <p class="text-gray-600 text-sm">Check <strong>{{.Email}}</strong> for a login link.</p>
+    <p class="text-gray-400 text-xs mt-2">It expires in 15 minutes.</p>
+    {{else}}
+    <p class="text-gray-500 text-sm mb-6">Enter via magic link</p>
+    <form method="POST" action="/login">
+      <button type="submit"
+        class="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 font-medium text-sm">
+        Send login link
+      </button>
+    </form>
+    {{end}}
+  </div>
+</div>
+{{end}}

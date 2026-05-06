@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/nrhtr/spruce/internal/config"
 	dbgen "github.com/nrhtr/spruce/internal/db/generated"
 	"github.com/nrhtr/spruce/internal/notifier"
 	"github.com/nrhtr/spruce/internal/scanner"
@@ -28,9 +29,10 @@ type Handler struct {
 	log     *slog.Logger
 	tmpls   map[string]*template.Template
 	loc     *time.Location
+	cfg     *config.Config
 }
 
-func New(db *sql.DB, queries *dbgen.Queries, scnr *scanner.Scanner, log *slog.Logger, loc *time.Location) (*Handler, error) {
+func New(db *sql.DB, queries *dbgen.Queries, scnr *scanner.Scanner, log *slog.Logger, loc *time.Location, cfg *config.Config) (*Handler, error) {
 	tmpls, err := parseTemplates()
 	if err != nil {
 		return nil, err
@@ -42,6 +44,7 @@ func New(db *sql.DB, queries *dbgen.Queries, scnr *scanner.Scanner, log *slog.Lo
 		log:     log,
 		tmpls:   tmpls,
 		loc:     loc,
+		cfg:     cfg,
 	}, nil
 }
 
@@ -87,6 +90,7 @@ func parseTemplates() (map[string]*template.Template, error) {
 		"listing_detail": {"base.html", "listing_detail.html"},
 		"bids":           {"base.html", "bids.html"},
 		"scan_runs":      {"base.html", "scan_runs.html"},
+		"login":          {"base.html", "login.html"},
 	}
 
 	tmpls := make(map[string]*template.Template, len(pages))
@@ -438,6 +442,8 @@ type listingRow struct {
 	EvalScore  float64
 	EndTime    string
 	EndingSoon bool
+	BidAmount  string // formatted, non-empty if a pending bid exists
+	BidResult  string // "pending"|"won"|"lost"|"retracted"|""
 }
 
 // fetchListings runs a dynamic SQL query based on the filter and returns rows + total count.
@@ -472,11 +478,16 @@ func (h *Handler) fetchListings(ctx context.Context, f listingsFilter) ([]listin
 	var args []any
 	var innerSQL string
 
+	bidSubqueries := `
+         COALESCE((SELECT result FROM bids WHERE listing_id = l.id ORDER BY placed_at DESC LIMIT 1), '') AS bid_result,
+         COALESCE((SELECT amount FROM bids WHERE listing_id = l.id ORDER BY placed_at DESC LIMIT 1), 0.0) AS bid_amount,
+         COALESCE((SELECT currency FROM bids WHERE listing_id = l.id ORDER BY placed_at DESC LIMIT 1), '') AS bid_currency`
+
 	if f.SearchID > 0 {
 		innerSQL = `SELECT l.id, l.external_id, l.platform, l.title, l.description, l.price,
          l.currency, l.url, l.image_urls, l.end_time, l.condition, l.location,
          l.raw_data, l.status, l.first_seen, l.last_seen,
-         COALESCE(e.score, -1) AS eval_score
+         COALESCE(e.score, -1) AS eval_score,` + bidSubqueries + `
   FROM listings l
   JOIN search_listings sl ON sl.listing_id = l.id
   LEFT JOIN evaluations e ON e.listing_id = l.id AND e.search_id = sl.search_id
@@ -497,7 +508,7 @@ func (h *Handler) fetchListings(ctx context.Context, f listingsFilter) ([]listin
          COALESCE(
            (SELECT e.score FROM evaluations e WHERE e.listing_id = l.id ORDER BY e.created_at DESC LIMIT 1),
            -1
-         ) AS eval_score
+         ) AS eval_score,` + bidSubqueries + `
   FROM listings l
   WHERE 1=1`
 
@@ -551,12 +562,15 @@ func (h *Handler) fetchListings(ctx context.Context, f listingsFilter) ([]listin
 			price                                         sql.NullFloat64
 			endTime                                       sql.NullInt64
 			evalScore                                     float64
+			bidResult, bidCurrency                        string
+			bidAmount                                     float64
 		)
 		if err := sqlRows.Scan(
 			&id, &externalID, &platform, &title, &description,
 			&price, &currency, &url, &imageUrls, &endTime,
 			&condition, &location, &rawData, &status,
 			&firstSeen, &lastSeen, &evalScore,
+			&bidResult, &bidAmount, &bidCurrency,
 		); err != nil {
 			return nil, 0, err
 		}
@@ -567,7 +581,7 @@ func (h *Handler) fetchListings(ctx context.Context, f listingsFilter) ([]listin
 			EndTime: endTime, Condition: condition, Location: location,
 			RawData: rawData, Status: status, FirstSeen: firstSeen, LastSeen: lastSeen,
 		}
-		lr := listingRow{Listing: listing, EvalScore: evalScore}
+		lr := listingRow{Listing: listing, EvalScore: evalScore, BidResult: bidResult}
 		if price.Valid {
 			lr.Price = notifier.FormatPrice(price, currency)
 		}
@@ -575,6 +589,9 @@ func (h *Handler) fetchListings(ctx context.Context, f listingsFilter) ([]listin
 			t := time.Unix(endTime.Int64, 0).In(h.loc)
 			lr.EndTime = t.Format("2 Jan 3:04pm")
 			lr.EndingSoon = time.Until(t) < 24*time.Hour
+		}
+		if bidResult == "pending" && bidAmount > 0 {
+			lr.BidAmount = notifier.FormatPrice(sql.NullFloat64{Float64: bidAmount, Valid: true}, bidCurrency)
 		}
 		results = append(results, lr)
 	}

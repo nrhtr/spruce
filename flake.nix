@@ -21,6 +21,12 @@
             govet.enable = true;
             gofmt.enable = true;
             markdownlint.enable = true;
+            gitleaks = {
+              enable = true;
+              name = "gitleaks";
+              entry = "${pkgs.gitleaks}/bin/gitleaks protect --staged -v";
+              pass_filenames = false;
+            };
           };
         };
       in {
@@ -33,6 +39,7 @@
             golangci-lint
             sqlc
             goose
+            gitleaks
           ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
             chromium
           ];

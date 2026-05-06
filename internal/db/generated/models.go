@@ -63,6 +63,13 @@ type Listing struct {
 	LastSeen    int64           `json:"last_seen"`
 }
 
+type MagicLink struct {
+	Token     string `json:"token"`
+	ExpiresAt int64  `json:"expires_at"`
+	Used      int64  `json:"used"`
+	CreatedAt int64  `json:"created_at"`
+}
+
 type ScanRun struct {
 	ID         int64         `json:"id"`
 	SearchID   int64         `json:"search_id"`
@@ -93,4 +100,10 @@ type SearchListing struct {
 	SearchID  int64 `json:"search_id"`
 	ListingID int64 `json:"listing_id"`
 	MatchedAt int64 `json:"matched_at"`
+}
+
+type Session struct {
+	Token     string `json:"token"`
+	ExpiresAt int64  `json:"expires_at"`
+	CreatedAt int64  `json:"created_at"`
 }

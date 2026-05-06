@@ -11,10 +11,15 @@ type Config struct {
 	ListenAddr      string
 	SiteURL         string
 	DevMode         bool
+	AdminToken      string
 	DigestHour      int
 	DigestTZ        string
 	EmailFrom       string
 	EmailTo         string
+	SMTPHost        string
+	SMTPPort        string
+	SMTPUser        string
+	SMTPPass        string
 	ScanCron        string
 	UrgentThreshold time.Duration
 
@@ -32,10 +37,15 @@ func Load() *Config {
 		ListenAddr:      getenv("SPRUCE_LISTEN_ADDR", ":8080"),
 		SiteURL:         getenv("SPRUCE_SITE_URL", ""),
 		DevMode:         os.Getenv("SPRUCE_DEV_MODE") == "true",
+		AdminToken:      getenv("SPRUCE_ADMIN_TOKEN", ""),
 		DigestHour:      getenvInt("SPRUCE_DIGEST_HOUR", 18),
 		DigestTZ:        getenv("SPRUCE_DIGEST_TZ", "Australia/Sydney"),
 		EmailFrom:       getenv("SPRUCE_EMAIL_FROM", "spruce@localhost"),
 		EmailTo:         getenv("SPRUCE_EMAIL_TO", ""),
+		SMTPHost:        getenv("SPRUCE_SMTP_HOST", ""),
+		SMTPPort:        getenv("SPRUCE_SMTP_PORT", "587"),
+		SMTPUser:        getenv("SPRUCE_SMTP_USER", ""),
+		SMTPPass:        getenv("SPRUCE_SMTP_PASS", ""),
 		ScanCron:        getenv("SPRUCE_SCAN_CRON", "0 */3 * * *"),
 		UrgentThreshold: getenvDuration("SPRUCE_URGENT_THRESHOLD", 12*time.Hour),
 
