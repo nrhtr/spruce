@@ -138,17 +138,18 @@ func run(log *slog.Logger) error {
 	mux.HandleFunc("GET /scan-runs/partial", auth(h.ScanRunsPartial))
 	mux.HandleFunc("GET /images/{hash}", auth(h.ProxyImage))
 
+	mux.HandleFunc("POST /debug/send-digest", auth(func(w http.ResponseWriter, r *http.Request) {
+		if err := notif.SendDigest(r.Context()); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		fmt.Fprintln(w, "digest sent")
+	}))
+
 	if cfg.DevMode {
 		mux.HandleFunc("GET /debug/email/digest", auth(h.DebugEmailDigest))
 		mux.HandleFunc("GET /debug/email/urgent", auth(h.DebugEmailUrgent))
-		mux.HandleFunc("POST /debug/send-digest", auth(func(w http.ResponseWriter, r *http.Request) {
-			if err := notif.SendDigest(r.Context()); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			fmt.Fprintln(w, "digest sent")
-		}))
-		log.Info("dev mode enabled", "routes", []string{"/debug/email/digest", "/debug/email/urgent", "/debug/send-digest"})
+		log.Info("dev mode enabled", "routes", []string{"/debug/email/digest", "/debug/email/urgent"})
 	}
 
 	srv := &http.Server{
