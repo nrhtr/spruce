@@ -510,7 +510,11 @@ func (h *Handler) fetchListings(ctx context.Context, f listingsFilter) ([]listin
            -1
          ) AS eval_score,` + bidSubqueries + `
   FROM listings l
-  WHERE 1=1`
+  WHERE EXISTS (
+    SELECT 1 FROM search_listings sl
+    JOIN searches s ON s.id = sl.search_id
+    WHERE sl.listing_id = l.id AND s.active = 1
+  )`
 
 		if !f.ShowMuted {
 			innerSQL += ` AND l.status != 'muted'`
