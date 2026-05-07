@@ -38,7 +38,7 @@ type SearchDigest struct {
 type ListingView struct {
 	Title      string
 	URL        string
-	DarklyURL  string
+	SpruceURL  string
 	Platform   string
 	Price      string
 	Score      float64
@@ -117,7 +117,7 @@ func (n *Notifier) SendDigest(ctx context.Context) error {
 			lv := ListingView{
 				Title:     e.Title,
 				URL:       e.Url,
-				DarklyURL: n.listingURL(e.ListingID),
+				SpruceURL: n.listingURL(e.ListingID),
 				Platform:  e.Platform,
 				Score:     e.Score,
 				Reasoning: e.Reasoning,
@@ -142,7 +142,7 @@ func (n *Notifier) SendDigest(ctx context.Context) error {
 		data.Searches = append(data.Searches, sd)
 	}
 
-	subject := fmt.Sprintf("Darkly Digest — %s", data.Date)
+	subject := fmt.Sprintf("Spruce Digest — %s", data.Date)
 	body, err := n.renderTemplate("digest.html", data)
 	if err != nil {
 		return fmt.Errorf("render digest: %w", err)
@@ -211,7 +211,7 @@ func (n *Notifier) CheckUrgent(ctx context.Context) error {
 		lv := ListingView{
 			Title:     l.Title,
 			URL:       l.Url,
-			DarklyURL: n.listingURL(l.ID),
+			SpruceURL: n.listingURL(l.ID),
 			Platform:  l.Platform,
 			Location:  l.Location,
 		}
@@ -226,7 +226,7 @@ func (n *Notifier) CheckUrgent(ctx context.Context) error {
 		data.Listings = append(data.Listings, lv)
 	}
 
-	subject := fmt.Sprintf("⚠️ Darkly Alert — %d auction(s) ending soon", len(actionable))
+	subject := fmt.Sprintf("⚠️ Spruce Alert — %d auction(s) ending soon", len(actionable))
 	body, err := n.renderTemplate("urgent.html", data)
 	if err != nil {
 		return fmt.Errorf("render urgent: %w", err)

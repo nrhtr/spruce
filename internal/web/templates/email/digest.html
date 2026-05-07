@@ -38,32 +38,40 @@
     </div>
     <div class="body">
 
-      {{range .Searches}}
-      <div class="section">
-        <p class="section-title">{{.Name}}</p>
-        <p class="section-sub">{{.NewCount}} new listing(s) since last digest</p>
+      {{if .Searches}}
+        {{range .Searches}}
+        <div class="section">
+          <p class="section-title">{{.Name}}</p>
+          <p class="section-sub">{{.NewCount}} new listing(s) since last digest</p>
 
-        {{range .TopListings}}
-        <div class="card">
-          <div class="card-row">
-            <div>
-              <a href="{{.URL}}" class="card-title">{{.Title}}</a>
-              <p class="card-meta">{{.Platform}}{{if .Condition}} · {{.Condition}}{{end}}{{if .Location}} · {{.Location}}{{end}}</p>
-              {{if .SpruceURL}}<a href="{{.SpruceURL}}" class="spruce-link">View in Spruce →</a>{{end}}
+          {{if .TopListings}}
+            {{range .TopListings}}
+            <div class="card">
+              <div class="card-row">
+                <div>
+                  <a href="{{.URL}}" class="card-title">{{.Title}}</a>
+                  <p class="card-meta">{{.Platform}}{{if .Condition}} · {{.Condition}}{{end}}{{if .Location}} · {{.Location}}{{end}}</p>
+                  {{if .SpruceURL}}<a href="{{.SpruceURL}}" class="spruce-link">View in Spruce →</a>{{end}}
+                </div>
+                {{if .Price}}<div class="card-price">{{.Price}}</div>{{end}}
+              </div>
+              {{if .EndTime}}
+              <p class="card-end {{if .EndingSoon}}end-urgent{{else}}end-normal{{end}}">
+                {{if .EndingSoon}}⚠ Ends {{else}}Ends {{end}}{{.EndTime}}
+              </p>
+              {{end}}
+              <p class="card-score">
+                <span class="score-num">{{printf "%.1f" .Score}}/10</span> — {{.Reasoning}}
+              </p>
             </div>
-            {{if .Price}}<div class="card-price">{{.Price}}</div>{{end}}
-          </div>
-          {{if .EndTime}}
-          <p class="card-end {{if .EndingSoon}}end-urgent{{else}}end-normal{{end}}">
-            {{if .EndingSoon}}⚠ Ends {{else}}Ends {{end}}{{.EndTime}}
-          </p>
+            {{end}}
+          {{else}}
+            <p style="color:#9ca3af;font-size:13px;">No listings scored ≥6 since last digest.</p>
           {{end}}
-          <p class="card-score">
-            <span class="score-num">{{printf "%.1f" .Score}}/10</span> — {{.Reasoning}}
-          </p>
         </div>
         {{end}}
-      </div>
+      {{else}}
+        <p style="color:#9ca3af;font-size:13px;text-align:center;padding:24px 0;">No active searches — nothing to report today.</p>
       {{end}}
 
       <hr class="divider">

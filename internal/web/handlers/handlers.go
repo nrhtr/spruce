@@ -1062,8 +1062,8 @@ func (h *Handler) DebugEmailDigest(w http.ResponseWriter, r *http.Request) {
 				"Name":     "NEC PC8801 Keyboard",
 				"NewCount": 3,
 				"TopListings": []notifier.ListingView{
-					{Title: "NEC PC-8801mkIISR キーボード ジャンク【20", URL: "#", DarklyURL: "#", Platform: "buyee", Price: "¥5,060", Score: 7.5, Reasoning: "Strong match for the PC-8801mkIISR. Junk condition raises questions, but price is very reasonable.", EndTime: "Wed 7 May 8:30pm", EndingSoon: true, Condition: "junk"},
-					{Title: "NEC PC-8801 FH FA FE MH MA MA2 MC VA VA2 VA3用 TYPE A キーボード 中古", URL: "#", DarklyURL: "#", Platform: "buyee", Price: "¥19,800", Score: 7.5, Reasoning: "Type A keyboard covering multiple PC-8801 variants. Used condition is preferable to junk.", EndTime: "Thu 8 May 9:30am", Condition: "used"},
+					{Title: "NEC PC-8801mkIISR キーボード ジャンク【20", URL: "#", SpruceURL: "#", Platform: "buyee", Price: "¥5,060", Score: 7.5, Reasoning: "Strong match for the PC-8801mkIISR. Junk condition raises questions, but price is very reasonable.", EndTime: "Wed 7 May 8:30pm", EndingSoon: true, Condition: "junk"},
+					{Title: "NEC PC-8801 FH FA FE MH MA MA2 MC VA VA2 VA3用 TYPE A キーボード 中古", URL: "#", SpruceURL: "#", Platform: "buyee", Price: "¥19,800", Score: 7.5, Reasoning: "Type A keyboard covering multiple PC-8801 variants. Used condition is preferable to junk.", EndTime: "Thu 8 May 9:30am", Condition: "used"},
 					{Title: "希少!! 通電OK NEC PC-8801 キーボード 当時物 昭和レトロ", URL: "#", Platform: "buyee", Price: "¥15,780", Score: 6.5, Reasoning: "Powers on. Original PC-8801 (not mkII), so switch variant uncertain.", EndTime: "Wed 7 May 8:30pm"},
 				},
 			},
@@ -1071,7 +1071,7 @@ func (h *Handler) DebugEmailDigest(w http.ResponseWriter, r *http.Request) {
 				"Name":     "Vintage Keyboards",
 				"NewCount": 1,
 				"TopListings": []notifier.ListingView{
-					{Title: "IBM Model M Space Saver — Near Mint w/ original box", URL: "#", DarklyURL: "#", Platform: "ebay", Price: "A$280", Score: 8.5, Reasoning: "Near-mint with original box is rare. Price is high but fair for condition. Local Melbourne seller.", Location: "Melbourne, VIC", Condition: "near mint"},
+					{Title: "IBM Model M Space Saver — Near Mint w/ original box", URL: "#", SpruceURL: "#", Platform: "ebay", Price: "A$280", Score: 8.5, Reasoning: "Near-mint with original box is rare. Price is high but fair for condition. Local Melbourne seller.", Location: "Melbourne, VIC", Condition: "near mint"},
 				},
 			},
 		},
@@ -1090,7 +1090,7 @@ func (h *Handler) DebugEmailUrgent(w http.ResponseWriter, r *http.Request) {
 	}
 	data := map[string]any{
 		"Listings": []notifier.ListingView{
-			{Title: "NEC PC-8801mkIISR キーボード ジャンク【20", URL: "#", DarklyURL: "#", Platform: "buyee", Price: "¥5,060", EndTime: "Wed 7 May 8:30pm", EndingSoon: true},
+			{Title: "NEC PC-8801mkIISR キーボード ジャンク【20", URL: "#", SpruceURL: "#", Platform: "buyee", Price: "¥5,060", EndTime: "Wed 7 May 8:30pm", EndingSoon: true},
 			{Title: "希少!! 通電OK NEC PC-8801 キーボード 当時物 昭和レトロ 激レア", URL: "#", Platform: "buyee", Price: "¥15,780", EndTime: "Wed 7 May 8:30pm", EndingSoon: true},
 		},
 	}
