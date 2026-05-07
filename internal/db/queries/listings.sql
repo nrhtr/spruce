@@ -51,6 +51,7 @@ ON CONFLICT DO NOTHING;
 SELECT * FROM listings
 WHERE status = 'active'
   AND end_time IS NOT NULL
+  AND end_time > unixepoch()
   AND end_time <= ?
 ORDER BY end_time ASC;
 

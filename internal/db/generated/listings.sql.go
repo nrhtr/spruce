@@ -125,6 +125,7 @@ const listEndingSoon = `-- name: ListEndingSoon :many
 SELECT id, external_id, platform, title, description, price, currency, url, image_urls, end_time, condition, location, raw_data, status, first_seen, last_seen FROM listings
 WHERE status = 'active'
   AND end_time IS NOT NULL
+  AND end_time > unixepoch()
   AND end_time <= ?
 ORDER BY end_time ASC
 `
