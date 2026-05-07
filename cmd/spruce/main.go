@@ -141,7 +141,14 @@ func run(log *slog.Logger) error {
 	if cfg.DevMode {
 		mux.HandleFunc("GET /debug/email/digest", auth(h.DebugEmailDigest))
 		mux.HandleFunc("GET /debug/email/urgent", auth(h.DebugEmailUrgent))
-		log.Info("dev mode enabled", "routes", []string{"/debug/email/digest", "/debug/email/urgent"})
+		mux.HandleFunc("POST /debug/send-digest", auth(func(w http.ResponseWriter, r *http.Request) {
+			if err := notif.SendDigest(r.Context()); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			fmt.Fprintln(w, "digest sent")
+		}))
+		log.Info("dev mode enabled", "routes", []string{"/debug/email/digest", "/debug/email/urgent", "/debug/send-digest"})
 	}
 
 	srv := &http.Server{
